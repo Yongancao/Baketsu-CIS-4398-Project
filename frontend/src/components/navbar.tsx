@@ -13,7 +13,8 @@ export default function Navbar() {
                 <Link href="/about-us"> About Us </Link>
             </div> 
             <div>
-                <Link href="/"> Login </Link>
+                <Link href="/register"> Register </Link>
+                <Link href="/login"> Login </Link>
             </div>
         </nav>
     )
