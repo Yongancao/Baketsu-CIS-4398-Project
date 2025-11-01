@@ -5,10 +5,19 @@ from database import SessionLocal, Base, engine
 from models import User
 from pydantic import BaseModel
 from passlib.context import CryptContext
+from fastapi.middleware.cors import CORSMiddleware
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():  
@@ -28,7 +37,7 @@ class UserCreate(BaseModel):
     password: str
 
 
-@app.post("/users/")
+@app.post("/register")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.username == user.username).first()
     if existing_user:
@@ -41,7 +50,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return {"id": db_user.id, "username": db_user.username}
 
-@app.post("/login/")
+@app.post("/login")
 def login(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == user.username).first()
     if not db_user or not pwd_context.verify(user.password, db_user.password):

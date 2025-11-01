@@ -4,28 +4,27 @@
 import { useState } from "react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
 
-    const res = await fetch("http://127.0.0.1:8000/login", {
+    const res = await fetch("http://127.0.0.1:8000/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
 
     if (!res.ok) {
-      setError("Invalid credentials");
+      setError("Registration failed. Please try again.");
       return;
     }
 
     const data = await res.json();
-    console.log("✅ Login successful:", data);
-
-    localStorage.setItem("token", data.access_token);
+    console.log("✅ Registration Successful:", data);
+    setError("");
   }
 
   return (
@@ -37,10 +36,10 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold mb-4">Register</h1>
 
         <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
+          type="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Username"
           className="border p-2 w-64 mb-3 rounded"
         />
 

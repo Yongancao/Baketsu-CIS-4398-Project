@@ -4,7 +4,7 @@
 import { useState } from "react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -14,7 +14,7 @@ export default function LoginPage() {
     const res = await fetch("http://127.0.0.1:8000/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
 
     if (!res.ok) {
@@ -25,7 +25,7 @@ export default function LoginPage() {
     const data = await res.json();
     console.log("✅ Login successful:", data);
 
-    localStorage.setItem("token", data.access_token);
+    //localStorage.setItem("token", data.access_token);
   }
 
   return (
@@ -37,10 +37,10 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold mb-4">Login</h1>
 
         <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
+          type="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Username"
           className="border p-2 w-64 mb-3 rounded"
         />
 
