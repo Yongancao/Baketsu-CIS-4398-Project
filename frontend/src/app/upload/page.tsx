@@ -2,16 +2,18 @@
 import { useState, DragEvent } from "react";
 
 export default function UploadPage() {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
+  // Select files manually
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) setFile(selectedFile);
+    const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+    setFiles(selectedFiles);
   };
 
+  // Drag-and-drop handlers
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
@@ -25,17 +27,20 @@ export default function UploadPage() {
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile) setFile(droppedFile);
+    const droppedFiles = e.dataTransfer.files
+      ? Array.from(e.dataTransfer.files)
+      : [];
+    setFiles(droppedFiles);
   };
 
+  // Upload logic
   const handleUpload = async () => {
-    if (!file) return alert("Please select a file first!");
+    if (files.length === 0) return alert("Please select a file first!");
     setUploading(true);
     setMessage("");
 
     const formData = new FormData();
-    formData.append("file", file);
+    files.forEach((file) => formData.append("files", file));
 
     try {
       const res = await fetch("http://127.0.0.1:8000/upload", {
@@ -45,14 +50,14 @@ export default function UploadPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setMessage(`✅ File uploaded successfully: ${data.filename}`);
-        setFile(null);
+        setMessage(`✅ Uploaded ${files.length} file(s) successfully`);
+        setFiles([]);
       } else {
         setMessage(`❌ Upload failed: ${data.detail || "Unknown error"}`);
       }
     } catch (err) {
       console.error(err);
-      setMessage("❌ Error uploading file");
+      setMessage("❌ Error uploading files");
     } finally {
       setUploading(false);
     }
@@ -74,9 +79,9 @@ export default function UploadPage() {
         }`}
       >
         <p className="text-center mb-4 text-gray-600 dark:text-gray-300">
-          {file
-            ? `Selected: ${file.name}`
-            : "Drag and drop your file here or select one below"}
+          {files.length > 0
+            ? `${files.length} file(s) selected`
+            : "Drag and drop your files here or select below"}
         </p>
 
         {/* Select File Button */}
@@ -84,11 +89,12 @@ export default function UploadPage() {
           htmlFor="fileInput"
           className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
-          Select File
+          Select Files
         </label>
         <input
           id="fileInput"
           type="file"
+          multiple
           onChange={handleFileSelect}
           className="hidden"
         />
@@ -97,7 +103,7 @@ export default function UploadPage() {
       {/* Upload Button */}
       <button
         onClick={handleUpload}
-        disabled={!file || uploading}
+        disabled={files.length === 0 || uploading}
         className="mt-6 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:bg-gray-400"
       >
         {uploading ? "Uploading..." : "Upload"}
