@@ -1,5 +1,6 @@
 "use client";
 import { useState, DragEvent } from "react";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
@@ -7,67 +8,98 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Select files manually
+  // ✅ Hardcoded S3 client (works in browser for testing)
+  const s3 = new S3Client({
+    region: "ap-southeast-2",
+    credentials: {
+      accessKeyId: "x",  //replace this
+      secretAccessKey: "x", //replace this
+    },
+    forcePathStyle: true,
+  });
+
+  const bucketName = "memorybucket127214161423";
+
+  // File select
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+    console.log("📂 Selected files:", selectedFiles.map((f) => f.name));
     setFiles(selectedFiles);
   };
 
-  // Drag-and-drop handlers
+  // Drag events
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
   };
-
   const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
   };
-
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
     const droppedFiles = e.dataTransfer.files
       ? Array.from(e.dataTransfer.files)
       : [];
+    console.log("📥 Dropped files:", droppedFiles.map((f) => f.name));
     setFiles(droppedFiles);
   };
 
-  // Upload logic
+  // Upload to S3 directly
   const handleUpload = async () => {
-    if (files.length === 0) return alert("Please select a file first!");
+    if (files.length === 0) {
+      alert("Please select a file first!");
+      return;
+    }
+
     setUploading(true);
     setMessage("");
-
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
+    console.log("🚀 Starting upload for", files.length, "file(s)...");
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/upload", {
-        method: "POST",
-        body: formData,
-      });
+      for (const file of files) {
+        console.log(`🟡 Uploading "${file.name}" (${file.size} bytes)...`);
 
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`✅ Uploaded ${files.length} file(s) successfully`);
-        setFiles([]);
-      } else {
-        setMessage(`❌ Upload failed: ${data.detail || "Unknown error"}`);
+        // ✅ Convert Blob → ArrayBuffer → Uint8Array for cross-browser compatibility
+        const arrayBuffer = await file.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        const command = new PutObjectCommand({
+          Bucket: bucketName,
+          Key: `raw/${file.name}`,
+          Body: uint8Array, // ✅ Correct format for SDK + TypeScript
+          ContentType: file.type,
+        });
+
+        try {
+          const response = await s3.send(command);
+          console.log(`✅ Success: "${file.name}" uploaded.`, response);
+        } catch (uploadError) {
+          console.error(`❌ Failed to upload "${file.name}"`, uploadError);
+          alert(
+            `Error uploading ${file.name}: ${JSON.stringify(uploadError, null, 2)}`
+          );
+          throw uploadError;
+        }
       }
+
+      setMessage(`✅ Uploaded ${files.length} file(s) to S3 successfully`);
+      console.log("🎉 All uploads finished successfully.");
+      setFiles([]);
     } catch (err) {
-      console.error(err);
-      setMessage("❌ Error uploading files");
+      console.error("🔥 S3 Upload Error:", err);
+      setMessage("❌ Error uploading to S3");
     } finally {
+      console.log("🕓 Upload process finished (success or fail).");
       setUploading(false);
     }
   };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-[#151516] text-black dark:text-white">
-      <h1 className="text-3xl font-semibold mb-6">Upload to the Cloud ☁️</h1>
+      <h1 className="text-3xl font-semibold mb-6">Upload to S3 ☁️</h1>
 
-      {/* Drag and Drop Zone */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -84,7 +116,6 @@ export default function UploadPage() {
             : "Drag and drop your files here or select below"}
         </p>
 
-        {/* Select File Button */}
         <label
           htmlFor="fileInput"
           className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -100,7 +131,6 @@ export default function UploadPage() {
         />
       </div>
 
-      {/* Upload Button */}
       <button
         onClick={handleUpload}
         disabled={files.length === 0 || uploading}
