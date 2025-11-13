@@ -2,30 +2,39 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-
-    const res = await fetch("http://127.0.0.1:8000/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!res.ok) {
-      setError("Invalid credentials");
-      return;
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("http://127.0.0.1:8000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!res.ok) {
+        setError("Invalid credentials");
+        return;
+      }
+      const data = await res.json();
+      // Store JWT (MVP: localStorage)
+      localStorage.setItem("access_token", data.access_token);
+      // Redirect to protected upload page
+      router.push("/upload");
+    } catch (err: any) {
+      setError("Login failed");
+    } finally {
+      setLoading(false);
     }
-
-    const data = await res.json();
-    console.log("✅ Login successful:", data);
-
-    //localStorage.setItem("token", data.access_token);
   }
 
   return (
@@ -54,12 +63,14 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          className="bg-[#4267B2] text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+          disabled={loading}
+          className="bg-[#4267B2] text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-60"
         >
-          Login
+          {loading ? "Logging in..." : "Login"}
         </button>
 
-        {error && <p className="text-red-500 mt-2">{error}</p>}
+  {error && <p className="text-red-500 mt-2">{error}</p>}
+  <p className="text-xs mt-4 text-gray-500"></p>
       </form>
     </div>
   );
