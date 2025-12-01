@@ -20,9 +20,7 @@ export default function Navbar() {
                 </Link>
             </div>
             <div className="flex gap-10">
-                <Link href="/" className="hover:underline"> Home </Link>
-                <Link href="/pricing" className="hover:underline"> Pricing </Link>
-                
+                <Link href="/" className="hover:underline"> Home </Link>                
             </div> 
             {isLoggedIn ? (
                 <>
