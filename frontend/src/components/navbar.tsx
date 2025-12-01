@@ -20,6 +20,7 @@ export default function Navbar() {
                 <Link href="/about-us" className="hover:underline"> About </Link>
                 <Link href="/pricing" className="hover:underline"> Pricing </Link>
                 <Link href="/upload" className="hover:underline"> Upload </Link>
+                <Link href="/dashboard" className="hover:underline"> Dashboard </Link>
             </div> 
             <div className="flex">
                 <Link href="/register" className="hover:underline"> Register </Link>
