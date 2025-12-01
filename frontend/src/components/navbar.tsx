@@ -4,22 +4,10 @@ import { useEffect, useState } from "react";
 
 import Logo from "./logo";
 import DarkModeToggle from "./DarkModeToggle";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
 
 export default function Navbar() {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    useEffect(() => {
-        const token = localStorage.getItem("access_token");
-        if (token) {
-            setIsLoggedIn(true);
-        } else {
-            setIsLoggedIn(false);
-        }
-    }, []);
-
-    const handleLogout = () => {
-        localStorage.removeItem("access_token");
-        setIsLoggedIn(false);
-    }
+    const {isLoggedIn, logout} = useAuthStatus();
 
     return (
         <nav className="fixed z-50 w-full flex items-center gap-10 pb-2 pt-2 bg-white dark:bg-[#151516] text-black dark:text-white">
@@ -41,7 +29,7 @@ export default function Navbar() {
                 <>
                     <Link href="/upload" className="hover:underline"> Upload </Link>
                     <Link href="/dashboard" className="hover:underline"> Dashboard </Link>
-                    <button onClick={handleLogout} className="hover:text-red-500">
+                    <button onClick={logout} className="hover:text-red-500">
                         Logout
                     </button>
                 </>

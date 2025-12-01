@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuthStatus();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -27,9 +29,9 @@ export default function LoginPage() {
       }
       const data = await res.json();
       // Store JWT (MVP: localStorage)
-      localStorage.setItem("access_token", data.access_token);
+      login(data.access_token);
       // Redirect to protected upload page
-      router.push("/upload");
+      router.push("/dashboard");
     } catch (err: any) {
       setError("Login failed");
     } finally {

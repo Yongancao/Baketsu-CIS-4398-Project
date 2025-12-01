@@ -2,24 +2,15 @@
 import { useState, DragEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
+import ProtectedPage from "@/components/ProtectedPage";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
-  const [authChecked, setAuthChecked] = useState(false);
   const router = useRouter();
-
-  // Simple auth guard (MVP): redirect if no token
-  useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-    if (!token) {
-      router.replace("/login");
-    } else {
-      setAuthChecked(true);
-    }
-  }, [router]);
 
   // ✅ Hardcoded S3 client (works in browser for testing)
   const s3 = new S3Client({
@@ -109,61 +100,49 @@ export default function UploadPage() {
     }
   };
 
-  if (!authChecked) {
-    return <div className="flex items-center justify-center min-h-screen">Checking auth...</div>;
-  }
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-[#151516] text-black dark:text-white">
-  <h1 className="text-3xl font-semibold mb-2">Upload to S3 ☁️</h1>
-  <p className="text-sm mb-4 text-gray-600 dark:text-gray-400">You are logged in. Token found in localStorage.</p>
-
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-2xl p-8 w-96 flex flex-col items-center justify-center transition-colors duration-300 ${
-          isDragging
-            ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-            : "border-gray-400 hover:border-blue-400"
-        }`}
-      >
-        <p className="text-center mb-4 text-gray-600 dark:text-gray-300">
-          {files.length > 0
-            ? `${files.length} file(s) selected`
-            : "Drag and drop your files here or select below"}
-        </p>
-
-        <label
-          htmlFor="fileInput"
-          className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+    <ProtectedPage>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-[#151516] text-black dark:text-white">
+        <h1 className="text-3xl font-semibold mb-2">Upload to S3 ☁️</h1>
+        <p className="text-sm mb-4 text-gray-600 dark:text-gray-400">You are logged in. Token found in localStorage.</p>
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`border-2 border-dashed rounded-2xl p-8 w-96 flex flex-col items-center justify-center transition-colors duration-300 ${
+            isDragging
+              ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+              : "border-gray-400 hover:border-blue-400"
+          }`}
         >
-          Select Files
-        </label>
-        <input
-          id="fileInput"
-          type="file"
-          multiple
-          onChange={handleFileSelect}
-          className="hidden"
-        />
+          <p className="text-center mb-4 text-gray-600 dark:text-gray-300">
+            {files.length > 0
+              ? `${files.length} file(s) selected`
+              : "Drag and drop your files here or select below"}
+          </p>
+          <label
+            htmlFor="fileInput"
+            className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Select Files
+          </label>
+          <input
+            id="fileInput"
+            type="file"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+        </div>
+        <button
+          onClick={handleUpload}
+          disabled={files.length === 0 || uploading}
+          className="mt-6 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:bg-gray-400"
+        >
+          {uploading ? "Uploading..." : "Upload"}
+        </button>
+        {message && <p className="mt-4 text-center">{message}</p>}
       </div>
-
-      <button
-        onClick={handleUpload}
-        disabled={files.length === 0 || uploading}
-        className="mt-6 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:bg-gray-400"
-      >
-        {uploading ? "Uploading..." : "Upload"}
-      </button>
-      <button
-        onClick={() => { localStorage.removeItem("access_token"); router.push("/login"); }}
-        className="mt-4 text-xs text-gray-500 underline"
-      >
-        Logout
-      </button>
-
-      {message && <p className="mt-4 text-center">{message}</p>}
-    </div>
+    </ProtectedPage>
   );
 }
