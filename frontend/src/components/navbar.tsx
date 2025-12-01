@@ -21,7 +21,6 @@ export default function Navbar() {
             </div>
             <div className="flex gap-10">
                 <Link href="/" className="hover:underline"> Home </Link>
-                <Link href="/about-us" className="hover:underline"> About </Link>
                 <Link href="/pricing" className="hover:underline"> Pricing </Link>
                 
             </div> 
