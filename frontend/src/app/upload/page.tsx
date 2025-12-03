@@ -1,8 +1,5 @@
 "use client";
-import { useState, DragEvent, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { useAuthStatus } from "@/hooks/useAuthStatus";
+import { useState, DragEvent } from "react";
 import ProtectedPage from "@/components/ProtectedPage";
 
 export default function UploadPage() {
@@ -10,25 +7,11 @@ export default function UploadPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
-  const router = useRouter();
 
-  // ✅ Hardcoded S3 client (works in browser for testing)
-  const s3 = new S3Client({
-    region: "ap-southeast-2",
-    credentials: {
-      accessKeyId: "x",  //replace this
-      secretAccessKey: "x", //replace this
-    },
-    forcePathStyle: true,
-  });
-
-  const bucketName = "memorybucket127214161423";
-
-  // File select
+  // Select files
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
-    console.log("📂 Selected files:", selectedFiles.map((f) => f.name));
-    setFiles(selectedFiles);
+    const selected = e.target.files ? Array.from(e.target.files) : [];
+    setFiles(selected);
   };
 
   // Drag events
@@ -43,59 +26,56 @@ export default function UploadPage() {
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    const droppedFiles = e.dataTransfer.files
-      ? Array.from(e.dataTransfer.files)
-      : [];
-    console.log("📥 Dropped files:", droppedFiles.map((f) => f.name));
-    setFiles(droppedFiles);
+
+    const dropped = e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+    setFiles(dropped);
   };
 
-  // Upload to S3 directly
+  // Upload to FASTAPI backend (NOT directly to S3)
   const handleUpload = async () => {
     if (files.length === 0) {
       alert("Please select a file first!");
       return;
     }
 
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      setMessage("❌ You are not logged in.");
+      return;
+    }
+
     setUploading(true);
     setMessage("");
-    console.log("🚀 Starting upload for", files.length, "file(s)...");
 
     try {
-      for (const file of files) {
-        console.log(`🟡 Uploading "${file.name}" (${file.size} bytes)...`);
+      // Build FormData
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file)); // multi-file support
 
-        // ✅ Convert Blob → ArrayBuffer → Uint8Array for cross-browser compatibility
-        const arrayBuffer = await file.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
+      console.log("📤 Sending files to FastAPI backend...");
 
-        const command = new PutObjectCommand({
-          Bucket: bucketName,
-          Key: `raw/${file.name}`,
-          Body: uint8Array, // ✅ Correct format for SDK + TypeScript
-          ContentType: file.type,
-        });
+      const res = await fetch("http://127.0.0.1:8000/files/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-        try {
-          const response = await s3.send(command);
-          console.log(`✅ Success: "${file.name}" uploaded.`, response);
-        } catch (uploadError) {
-          console.error(`❌ Failed to upload "${file.name}"`, uploadError);
-          alert(
-            `Error uploading ${file.name}: ${JSON.stringify(uploadError, null, 2)}`
-          );
-          throw uploadError;
-        }
+      const data = await res.json();
+      console.log("📥 Backend response:", data);
+
+      if (!res.ok) {
+        setMessage(`❌ Upload failed: ${data.detail || "Unknown error"}`);
+        return;
       }
 
-      setMessage(`✅ Uploaded ${files.length} file(s) to S3 successfully`);
-      console.log("🎉 All uploads finished successfully.");
+      setMessage("✅ Upload successful!");
       setFiles([]);
-    } catch (err) {
-      console.error("🔥 S3 Upload Error:", err);
-      setMessage("❌ Error uploading to S3");
+    } catch (error) {
+      console.error("🔥 Upload error:", error);
+      setMessage("❌ An error occurred while uploading.");
     } finally {
-      console.log("🕓 Upload process finished (success or fail).");
       setUploading(false);
     }
   };
@@ -103,22 +83,23 @@ export default function UploadPage() {
   return (
     <ProtectedPage>
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-[#151516] text-black dark:text-white">
-        <h1 className="text-3xl font-semibold mb-2">Upload to S3 ☁️</h1>
-        <p className="text-sm mb-4 text-gray-600 dark:text-gray-400">You are logged in. Token found in localStorage.</p>
+        <h1 className="text-3xl font-semibold mb-2">Upload Files ☁️</h1>
+
+        {/* Drag & Drop zone */}
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-2xl p-8 w-96 flex flex-col items-center justify-center transition-colors duration-300 ${
+          className={`border-2 border-dashed rounded-2xl p-8 w-96 flex flex-col items-center justify-center transition ${
             isDragging
               ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
               : "border-gray-400 hover:border-blue-400"
           }`}
         >
-          <p className="text-center mb-4 text-gray-600 dark:text-gray-300">
+          <p className="text-center mb-4">
             {files.length > 0
               ? `${files.length} file(s) selected`
-              : "Drag and drop your files here or select below"}
+              : "Drag and drop files, or click below"}
           </p>
           <label
             htmlFor="fileInput"
@@ -134,6 +115,8 @@ export default function UploadPage() {
             className="hidden"
           />
         </div>
+
+        {/* Upload button */}
         <button
           onClick={handleUpload}
           disabled={files.length === 0 || uploading}
@@ -141,6 +124,7 @@ export default function UploadPage() {
         >
           {uploading ? "Uploading..." : "Upload"}
         </button>
+
         {message && <p className="mt-4 text-center">{message}</p>}
       </div>
     </ProtectedPage>
