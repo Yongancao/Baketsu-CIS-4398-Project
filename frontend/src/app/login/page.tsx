@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -10,26 +11,28 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuthStatus();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/login", {
+      const res = await fetch("http://127.0.0.1:8000/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
       if (!res.ok) {
-        setError("Invalid credentials");
+        const errData = await res.json();
+        setError(errData.detail || "Invalid credentials");
         return;
       }
       const data = await res.json();
       // Store JWT (MVP: localStorage)
-      localStorage.setItem("access_token", data.access_token);
+      login(data.access_token);
       // Redirect to protected upload page
-      router.push("/upload");
+      router.push("/dashboard");
     } catch (err: any) {
       setError("Login failed");
     } finally {

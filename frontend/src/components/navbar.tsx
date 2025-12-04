@@ -1,10 +1,14 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import Logo from "./logo";
 import DarkModeToggle from "./DarkModeToggle";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
 
 export default function Navbar() {
+    const {isLoggedIn, logout} = useAuthStatus();
+
     return (
         <nav className="fixed z-50 w-full flex items-center gap-10 pb-2 pt-2 bg-white dark:bg-[#151516] text-black dark:text-white">
 
@@ -16,16 +20,25 @@ export default function Navbar() {
                 </Link>
             </div>
             <div className="flex gap-10">
-                <Link href="/" className="hover:underline"> Home </Link>
-                <Link href="/about-us" className="hover:underline"> About </Link>
-                <Link href="/pricing" className="hover:underline"> Pricing </Link>
-                <Link href="/upload" className="hover:underline"> Upload </Link>
+                <Link href="/" className="hover:underline"> Home </Link>                
             </div> 
-            <div className="flex">
-                <Link href="/register" className="hover:underline"> Register </Link>
-                <p> / </p>
-                <Link href="/login" className="hover:underline"> Login </Link>
-            </div>
+            {isLoggedIn ? (
+                <>
+                    <Link href="/upload" className="hover:underline"> Upload </Link>
+                    <Link href="/dashboard" className="hover:underline"> Dashboard </Link>
+                    <button onClick={logout} className="hover:text-red-500">
+                        Logout
+                    </button>
+                </>
+            ) : (
+                <>
+                    <div className="flex">
+                        <Link href="/register" className="hover:underline"> Register </Link>
+                        <p> / </p>
+                        <Link href="/login" className="hover:underline"> Login </Link>
+                    </div>
+                </>
+            )}
             <DarkModeToggle/>
         </nav>
     )
