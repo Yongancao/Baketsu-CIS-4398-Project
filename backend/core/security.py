@@ -6,7 +6,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from core.config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_EXPIRES_MINUTES
-from database import get_db
+from core.database import get_db
 from models import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

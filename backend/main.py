@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import Base, engine
+from core.database import Base, engine
 from routes.auth_routes import router as auth_router
 from routes.file_routes import router as file_router
 from routes.storage_routes import router as storage_router
