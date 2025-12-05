@@ -22,11 +22,17 @@ print("DEBUG secret =", AWS_SECRET_ACCESS_KEY)
 print("DEBUG region =", AWS_REGION)
 
 def upload_file_to_s3(file, key: str):
-    """
-    Upload file bytes to S3.
-    key = path inside S3 (ex: users/3/photo.png)
-    """
     s3.upload_fileobj(file, AWS_BUCKET_NAME, key)
 
 def delete_file_from_s3(key: str):
     s3.delete_object(Bucket=AWS_BUCKET_NAME, Key=key)
+
+def generate_presigned_url(key: str, expires_in: int = 300):
+    """
+    Generate a temporary URL that allows the user to access S3 file for preview or download.
+    """
+    return s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": AWS_BUCKET_NAME, "Key": key},
+        ExpiresIn=expires_in
+    )

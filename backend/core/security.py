@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from core.config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_EXPIRES_MINUTES
 from core.database import get_db
-from models import User
+from models import User, UserFile
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()

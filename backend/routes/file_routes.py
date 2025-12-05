@@ -5,8 +5,8 @@ from io import BytesIO
 
 from core.security import get_current_user
 from core.database import get_db
-from models import UserFile
-from s3_client import upload_file_to_s3, delete_file_from_s3
+from models import User, UserFile
+from services.s3_client import upload_file_to_s3, delete_file_from_s3
 
 router = APIRouter()
 
