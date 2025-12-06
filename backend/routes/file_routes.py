@@ -56,6 +56,24 @@ async def upload_files(
 
     return {"message": "Files uploaded successfully", "uploaded": uploaded}
 
+@router.delete("/{file_id}")
+async def delete_file(
+    file_id: int,
+    db: Session = Depends(get_db), 
+    current_user = Depends(get_current_user)
+):
+    file_record = db.query(UserFile).filter(UserFile.user_id == current_user.id, UserFile.id == file_id).first()
+
+    if not file_record: 
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    delete_file_from_s3(file_record.file_key)
+
+    db.delete(file_record)
+    db.commit()
+
+    return {"message": "File deleted successfully"}
+
 @router.get("/list", response_model=List[FileListItem])
 async def list_files(
     db: Session = Depends(get_db),
