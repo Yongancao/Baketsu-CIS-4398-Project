@@ -8,6 +8,8 @@ export default function DashboardPage() {
   const [message, setMessage] = useState("");
   const [totalFiles, setTotalFiles] = useState<number | null>(null);
   const [totalBytes, setTotalBytes] = useState<number | null>(null);
+  const [actualCost, setActualCost] = useState<number | null>(null);
+  const [estimatedCost, setEstimatedCost] = useState<number | null>(null);
 
   // Convert raw bytes → human-readable string
   function formatBytes(bytes: number): string {
@@ -42,6 +44,19 @@ export default function DashboardPage() {
         setTotalBytes(stats.total_bytes);
       })
       .catch(() => setMessage("⚠️ Error loading storage statistics."));
+
+    fetch("http://127.0.0.1:8000/files/billing", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("BILLING RESPONSE:", data);
+
+        setActualCost(data.actual_cost ?? 0);
+        setEstimatedCost(data.estimated_cost ?? 0);
+      })
+      .catch(() => setMessage("⚠️ Error loading billing statistics."));
+
   }, []);
 
   return (
@@ -78,6 +93,28 @@ export default function DashboardPage() {
                 </h2>
                 <p className="text-4xl font-bold mt-2">
                   {totalBytes !== null ? formatBytes(totalBytes) : "—"}
+                </p>
+              </div>
+
+              <div className="p-6 rounded-xl border shadow dark:border-gray-700 dark:bg-[#1d1d1d]">
+                <h2 className="text-lg font-medium text-gray-600 dark:text-gray-300">
+                  Actual Cost
+                </h2>
+                <p className="text-4xl font-bold mt-2">
+                  {typeof actualCost === "number"
+                    ? `$${actualCost.toFixed(10)}`
+                    : "—"}
+                </p>
+              </div>
+
+              <div className="p-6 rounded-xl border shadow dark:border-gray-700 dark:bg-[#1d1d1d]">
+                <h2 className="text-lg font-medium text-gray-600 dark:text-gray-300">
+                  Estimated Pricing
+                </h2>
+                <p className="text-4xl font-bold mt-2">
+                  {typeof estimatedCost === "number"
+                    ? `$${estimatedCost.toFixed(10)}`
+                    : "—"}
                 </p>
               </div>
 

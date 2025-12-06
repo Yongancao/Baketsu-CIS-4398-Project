@@ -18,3 +18,4 @@ class UserFile(Base):
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
 
     folder = relationship("Folder", back_populates="files")
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
