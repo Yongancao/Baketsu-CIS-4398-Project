@@ -15,6 +15,7 @@ router = APIRouter(prefix="/files", tags=["Files"])
 @router.post("/upload")
 async def upload_files(
     files: List[UploadFile] = File(...),
+    folder_id: int | None = None,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -25,7 +26,10 @@ async def upload_files(
 
     for file in files:
         filename = file.filename
-        key = f"users/{current_user.id}/{filename}"
+        if folder_id:
+            key = f"users/{current_user.id}/folders/{folder_id}/{filename}"
+        else:
+            key = f"users/{current_user.id}/{filename}"
 
         # ✅ Read file into memory
         file_bytes = await file.read()
@@ -43,7 +47,8 @@ async def upload_files(
             user_id=current_user.id,
             filename=filename,
             file_key=key,
-            file_size=len(file_bytes)
+            file_size=len(file_bytes),
+            folder_id=folder_id
         )
         db.add(db_file)
         db.commit()
