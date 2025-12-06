@@ -9,3 +9,22 @@ class FileOut(BaseModel):
 
     class Config:
         orm_mode = True
+
+class FileDetailResponse(BaseModel):
+    id: int
+    filename: str
+    file_size: int
+    preview_url: str
+    uploaded_at: str | datetime | None
+
+    class Config:
+        from_attributes = True
+
+class FileListItem(BaseModel):
+    id: int
+    filename: str
+    file_size: int
+    uploaded_at: str | datetime | None = None
+
+    class Config:
+        from_attributes = True
