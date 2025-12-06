@@ -8,7 +8,7 @@ from core.database import get_db
 from models import User, UserFile
 from schemas.file_schemas import FileDetailResponse, FileListItem
 from services.s3_client import upload_file_to_s3, delete_file_from_s3, generate_presigned_url
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -55,6 +55,97 @@ async def upload_files(
         })
 
     return {"message": "Files uploaded successfully", "uploaded": uploaded}
+
+@router.get("/billing")
+async def get_billing(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    MONTHLY_RATE = 0.023  # cost per GB per month
+    now = datetime.utcnow()
+
+    def safe_date(value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, str):
+            try:
+                return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").date()
+            except:
+                try:
+                    return datetime.fromisoformat(value).date()
+                except:
+                    return None
+        return None
+
+    billing_start = datetime(now.year, now.month, 1).date()
+
+    if now.month == 12:
+        next_month = datetime(now.year + 1, 1, 1)
+    else:
+        next_month = datetime(now.year, now.month + 1, 1)
+
+    billing_end = (next_month - timedelta(seconds=1)).date()
+    month_days = (billing_end - billing_start).days + 1
+    DAILY_RATE = MONTHLY_RATE / month_days
+
+    files = db.query(UserFile).filter(
+        UserFile.user_id == current_user.id
+    ).all()
+
+    actual_cost = 0
+    estimated_cost = 0
+
+    for f in files:
+        file_upload_day = safe_date(f.uploaded_at)
+        deletion_day = safe_date(f.deleted_at)
+
+        if not file_upload_day:
+            continue  # skip any corrupted rows
+
+        # Actual cost this month
+        actual_start = max(file_upload_day, billing_start)
+        actual_end = min(deletion_day or now.date(), now.date())
+        chargeable_days_actual = (actual_end - actual_start).days + 1
+        if chargeable_days_actual < 1:
+            chargeable_days_actual = 0
+
+        gb_size = f.file_size / (1024**3)
+        actual_cost += gb_size * DAILY_RATE * chargeable_days_actual
+
+        # Estimated total cost
+        est_end = min(deletion_day or billing_end, billing_end)
+        chargeable_days_est = (est_end - actual_start).days + 1
+        if chargeable_days_est < 1:
+            chargeable_days_est = 0
+
+        estimated_cost += gb_size * DAILY_RATE * chargeable_days_est
+
+    return {
+        "daily_rate_per_gb": DAILY_RATE,
+        "actual_cost": round(actual_cost, 10),
+        "estimated_cost": round(estimated_cost, 10),
+        "days_in_month": month_days,
+    }
+
+@router.delete("/{file_id}")
+async def delete_file(
+    file_id: int,
+    db: Session = Depends(get_db), 
+    current_user = Depends(get_current_user)
+):
+    file_record = db.query(UserFile).filter(UserFile.user_id == current_user.id, UserFile.id == file_id).first()
+
+    if not file_record: 
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    delete_file_from_s3(file_record.file_key)
+
+    file_record.deleted_at = datetime.utcnow()
+    db.commit()
+
+    return {"message": "File deleted successfully"}
 
 @router.get("/list", response_model=List[FileListItem])
 async def list_files(

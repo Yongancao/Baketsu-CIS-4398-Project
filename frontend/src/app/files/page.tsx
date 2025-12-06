@@ -9,6 +9,19 @@ export default function FilesPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    async function deleteFile(id) {
+        const token = localStorage.getItem("access_token");
+
+        await fetch(`http://127.0.0.1:8000/files/${id}`, {
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        setFiles(prev => prev.filter(file => file.id !== id));
+    }
+
     // Helper to detect image files
     function isImageFile(filename: string) {
         return /\.(png|jpg|jpeg|gif|webp)$/i.test(filename);
@@ -82,25 +95,37 @@ export default function FilesPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {files.map((file) => (
-                        <Link
+                        <div
                             key={file.id}
-                            href={`/files/${file.id}`}
                             className="border rounded-lg p-4 shadow-sm hover:shadow-md transition"
                         >
-                            {file.thumbnailUrl && (
-                                <img
-                                    src={file.thumbnailUrl}
-                                    alt={file.filename}
-                                    className="w-full h-40 object-cover rounded mb-2"
-                                />
-                            )}
-
-                            <div className="font-medium">{file.filename}</div>
-
-                            <div className="text-sm text-gray-600">
-                                {(file.file_size / 1024).toFixed(1)} KB
+                            <Link
+                                key={file.id}
+                                href={`/files/${file.id}`}
+                                className="p-4 shadow-sm hover:shadow-md transition"
+                            >
+                                {file.thumbnailUrl && (
+                                    <img
+                                        src={file.thumbnailUrl}
+                                        alt={file.filename}
+                                        className="w-full h-40 object-cover rounded mb-2"
+                                    />
+                                )}
+                            </Link>
+                            <div className="flex justify-between">
+                                <div className="flex flex-col">
+                                    <div className="font-medium">{file.filename}</div>
+                                    <div className="text-sm text-gray-600">
+                                        {(file.file_size / 1024).toFixed(1)} KB
+                                    </div>
+                                </div>
+                                <div>
+                                    <button onClick={() => deleteFile(file.id)}>
+                                        Delete
+                                    </button>
+                                </div>
                             </div>
-                        </Link>
+                        </div>
                     ))}
                 </div>
             </div>
