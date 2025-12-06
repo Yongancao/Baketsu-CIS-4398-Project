@@ -18,6 +18,6 @@ app.add_middleware(
 )
 
 # Routers
-app.include_router(auth_router, prefix="/auth")
-app.include_router(file_router, prefix="/files")
+app.include_router(auth_router)
+app.include_router(file_router)
 app.include_router(storage_router)
