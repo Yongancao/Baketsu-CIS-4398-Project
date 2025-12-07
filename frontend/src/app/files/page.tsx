@@ -25,6 +25,46 @@ export default function FilesPage() {
         setFiles(prev => prev.filter(file => file.id !== id));
     }
 
+    async function downloadFile(id: number, filename: string) {
+        const token = localStorage.getItem("access_token");
+
+        const res = await fetch(`http://127.0.0.1:8000/files/${id}/download`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        const data = await res.json();
+        
+        // Create a temporary link and trigger download
+        const link = document.createElement("a");
+        link.href = data.download_url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    async function downloadFile(id: number, filename: string) {
+        const token = localStorage.getItem("access_token");
+
+        const res = await fetch(`http://127.0.0.1:8000/files/${id}/download`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        const data = await res.json();
+        
+        // Create a temporary link and trigger download
+        const link = document.createElement("a");
+        link.href = data.download_url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
     // ----------------------
     // CREATE FOLDER
     // ----------------------
@@ -183,16 +223,27 @@ export default function FilesPage() {
                                 )}
                             </Link>
                             <div className="flex justify-between">
-                                <div className="flex flex-col">
-                                    <div className="font-medium">{file.filename}</div>
+                                <div className="flex flex-col flex-1 min-w-0 mr-2">
+                                    <div 
+                                        className="font-medium truncate" 
+                                        title={file.filename}
+                                    >
+                                        {file.filename}
+                                    </div>
                                     <div className="text-sm text-gray-600">
                                         {(file.file_size / 1024).toFixed(1)} KB
                                     </div>
                                 </div>
-                                <div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => downloadFile(file.id, file.filename)}
+                                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                                    >
+                                        Download
+                                    </button>
                                     <button
                                         onClick={() => deleteFile(file.id)}
-                                        className="text-red-600 hover:text-red-800"
+                                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
                                     >
                                         Delete
                                     </button>

@@ -7,4 +7,4 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
-    folder_id = Column(Integer, ForeignKey("folders.id"), nullable=True)
+    folder_id = Column(Integer, ForeignKey("folders.id", use_alter=True, name="fk_user_folder"), nullable=True)
