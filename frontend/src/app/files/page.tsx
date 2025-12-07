@@ -9,6 +9,17 @@ export default function FilesPage() {
     const [folders, setFolders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [viewMode, setViewMode] = useState<"small" | "medium" | "large" | "details" | "list">(() => {
+        if (typeof window !== "undefined") {
+            return (localStorage.getItem("filesViewMode") as any) || "medium";
+        }
+        return "medium";
+    });
+
+    const handleViewModeChange = (mode: "small" | "medium" | "large" | "details" | "list") => {
+        setViewMode(mode);
+        localStorage.setItem("filesViewMode", mode);
+    };
 
     // ----------------------
     // DELETE FILE
@@ -193,70 +204,260 @@ export default function FilesPage() {
 
     return (
         <ProtectedPage>
-            <div className="p-8 relative min-h-screen">
-                <h1 className="text-3xl font-semibold mb-6">Your Files & Folders</h1>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* FOLDERS */}
-                    {folders.map(folder => (
-                        <div
-                            key={folder.id}
-                            className="border rounded-lg p-4 shadow-sm hover:shadow-md transition flex flex-col items-center justify-center bg-black-100 cursor-pointer"
-                            onDrop={(e) => onDrop(e, folder.id)}
-                            onDragOver={onDragOver}
+            <div className="p-8 pt-24 relative min-h-screen">
+                <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Your Files & Folders</h1>
+                    
+                    <div className="flex items-center gap-4">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</label>
+                        <select 
+                            value={viewMode}
+                            onChange={(e) => handleViewModeChange(e.target.value as any)}
+                            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:border-gray-400 dark:hover:border-gray-500 transition"
                         >
-                            <span className="text-6xl">📁</span>
-                            <div className="mt-2 font-medium">{folder.name}</div>
-                        </div>
-                    ))}
+                            <option value="small">Small Icons</option>
+                            <option value="medium">Medium Icons</option>
+                            <option value="large">Large Icons</option>
+                            <option value="details">Details</option>
+                            <option value="list">List</option>
+                        </select>
+                    </div>
+                </div>
 
-                    {/* FILES */}
-                    {files.map(file => (
-                        <div
-                            key={file.id}
-                            draggable
-                            onDragStart={(e) => onDragStart(e, file.id)}
-                            className="border rounded-lg p-4 shadow-sm hover:shadow-md transition cursor-grab"
-                        >
-                            <Link href={`/files/${file.id}`} className="p-4 block">
-                                {file.thumbnailUrl && (
-                                    <img
-                                        src={file.thumbnailUrl}
-                                        alt={file.filename}
-                                        className="w-full h-40 object-cover rounded mb-2"
-                                    />
-                                )}
-                            </Link>
-                            <div className="flex justify-between">
-                                <div className="flex flex-col flex-1 min-w-0 mr-2">
-                                    <div 
-                                        className="font-medium truncate" 
-                                        title={file.filename}
-                                    >
-                                        {file.filename}
+                {/* Small Icons View */}
+                {viewMode === "small" && (
+                    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                        {folders.map(folder => (
+                            <div
+                                key={`folder-${folder.id}`}
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-pointer"
+                                onDrop={(e) => onDrop(e, folder.id)}
+                                onDragOver={onDragOver}
+                            >
+                                <div className="w-full h-16 flex items-center justify-center text-4xl">📁</div>
+                                <div className="text-xs truncate text-gray-900 dark:text-gray-100 text-center" title={folder.name}>{folder.name}</div>
+                            </div>
+                        ))}
+                        {files.map((file) => (
+                            <div 
+                                key={file.id} 
+                                draggable
+                                onDragStart={(e) => onDragStart(e, file.id)}
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab"
+                            >
+                                <Link href={`/files/${file.id}`} className="block">
+                                    {file.thumbnailUrl ? (
+                                        <img src={file.thumbnailUrl} alt={file.filename} className="w-full h-16 object-cover rounded mb-1" />
+                                    ) : (
+                                        <div className="w-full h-16 bg-gray-200 dark:bg-gray-700 rounded mb-1 flex items-center justify-center text-xs">📄</div>
+                                    )}
+                                    <div className="text-xs truncate text-gray-900 dark:text-gray-100" title={file.filename}>{file.filename}</div>
+                                </Link>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Medium Icons View */}
+                {viewMode === "medium" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {folders.map(folder => (
+                            <div
+                                key={`folder-${folder.id}`}
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 flex flex-col items-center justify-center cursor-pointer"
+                                onDrop={(e) => onDrop(e, folder.id)}
+                                onDragOver={onDragOver}
+                            >
+                                <span className="text-6xl">📁</span>
+                                <div className="mt-2 font-medium text-gray-900 dark:text-gray-100">{folder.name}</div>
+                            </div>
+                        ))}
+                        {files.map((file) => (
+                            <div 
+                                key={file.id} 
+                                draggable
+                                onDragStart={(e) => onDragStart(e, file.id)}
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab"
+                            >
+                                <Link href={`/files/${file.id}`} className="block mb-2">
+                                    {file.thumbnailUrl ? (
+                                        <img src={file.thumbnailUrl} alt={file.filename} className="w-full h-40 object-cover rounded mb-2" />
+                                    ) : (
+                                        <div className="w-full h-40 bg-gray-200 dark:bg-gray-700 rounded mb-2 flex items-center justify-center text-4xl">📄</div>
+                                    )}
+                                </Link>
+                                <div className="flex justify-between">
+                                    <div className="flex flex-col flex-1 min-w-0 mr-2">
+                                        <div className="font-medium truncate text-gray-900 dark:text-gray-100" title={file.filename}>{file.filename}</div>
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</div>
                                     </div>
-                                    <div className="text-sm text-gray-600">
-                                        {(file.file_size / 1024).toFixed(1)} KB
+                                    <div className="flex gap-2">
+                                        <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition">Download</button>
+                                        <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Large Icons View */}
+                {viewMode === "large" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {folders.map(folder => (
+                            <div
+                                key={`folder-${folder.id}`}
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 flex flex-col items-center justify-center cursor-pointer"
+                                onDrop={(e) => onDrop(e, folder.id)}
+                                onDragOver={onDragOver}
+                            >
+                                <span className="text-8xl">📁</span>
+                                <div className="mt-3 font-medium text-lg text-gray-900 dark:text-gray-100">{folder.name}</div>
+                            </div>
+                        ))}
+                        {files.map((file) => (
+                            <div 
+                                key={file.id} 
+                                draggable
+                                onDragStart={(e) => onDragStart(e, file.id)}
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab"
+                            >
+                                <Link href={`/files/${file.id}`} className="block mb-3">
+                                    {file.thumbnailUrl ? (
+                                        <img src={file.thumbnailUrl} alt={file.filename} className="w-full h-64 object-cover rounded mb-3" />
+                                    ) : (
+                                        <div className="w-full h-64 bg-gray-200 dark:bg-gray-700 rounded mb-3 flex items-center justify-center text-6xl">📄</div>
+                                    )}
+                                </Link>
+                                <div className="flex justify-between items-start">
+                                    <div className="flex flex-col flex-1 min-w-0 mr-3">
+                                        <div className="font-medium text-lg truncate text-gray-900 dark:text-gray-100" title={file.filename}>{file.filename}</div>
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition">Download</button>
+                                        <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Details View */}
+                {viewMode === "details" && (
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+                        <table className="w-full">
+                            <thead className="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                                <tr>
+                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Preview</th>
+                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Name</th>
+                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Size</th>
+                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Uploaded</th>
+                                    <th className="text-right p-3 font-medium text-gray-900 dark:text-gray-100">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {folders.map(folder => (
+                                    <tr 
+                                        key={`folder-${folder.id}`} 
+                                        className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer"
+                                        onDrop={(e) => onDrop(e, folder.id)}
+                                        onDragOver={onDragOver}
+                                    >
+                                        <td className="p-3">
+                                            <div className="w-12 h-12 flex items-center justify-center text-2xl">📁</div>
+                                        </td>
+                                        <td className="p-3">
+                                            <span className="text-gray-900 dark:text-gray-100 font-medium">{folder.name}</span>
+                                        </td>
+                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">—</td>
+                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">—</td>
+                                        <td className="p-3"></td>
+                                    </tr>
+                                ))}
+                                {files.map((file) => (
+                                    <tr 
+                                        key={file.id} 
+                                        draggable
+                                        onDragStart={(e) => onDragStart(e, file.id)}
+                                        className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-grab"
+                                    >
+                                        <td className="p-3">
+                                            <Link href={`/files/${file.id}`}>
+                                                {file.thumbnailUrl ? (
+                                                    <img src={file.thumbnailUrl} alt={file.filename} className="w-12 h-12 object-cover rounded" />
+                                                ) : (
+                                                    <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">📄</div>
+                                                )}
+                                            </Link>
+                                        </td>
+                                        <td className="p-3">
+                                            <Link href={`/files/${file.id}`} className="hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block max-w-xs" title={file.filename}>
+                                                {file.filename}
+                                            </Link>
+                                        </td>
+                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</td>
+                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{file.uploaded_at ? new Date(file.uploaded_at).toLocaleDateString() : 'N/A'}</td>
+                                        <td className="p-3 text-right">
+                                            <div className="flex gap-2 justify-end">
+                                                <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm">Download</button>
+                                                <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm">Delete</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* List View */}
+                {viewMode === "list" && (
+                    <div className="space-y-2">
+                        {folders.map(folder => (
+                            <div 
+                                key={`folder-${folder.id}`} 
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition flex items-center justify-between bg-white dark:bg-gray-800 cursor-pointer"
+                                onDrop={(e) => onDrop(e, folder.id)}
+                                onDragOver={onDragOver}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="text-4xl">📁</div>
+                                    <div className="font-medium text-gray-900 dark:text-gray-100">{folder.name}</div>
+                                </div>
+                            </div>
+                        ))}
+                        {files.map((file) => (
+                            <div 
+                                key={file.id} 
+                                draggable
+                                onDragStart={(e) => onDragStart(e, file.id)}
+                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition flex items-center justify-between bg-white dark:bg-gray-800 cursor-grab"
+                            >
+                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                    <Link href={`/files/${file.id}`}>
+                                        {file.thumbnailUrl ? (
+                                            <img src={file.thumbnailUrl} alt={file.filename} className="w-16 h-16 object-cover rounded" />
+                                        ) : (
+                                            <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center text-2xl">📄</div>
+                                        )}
+                                    </Link>
+                                    <div className="flex-1 min-w-0">
+                                        <Link href={`/files/${file.id}`} className="font-medium hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block" title={file.filename}>
+                                            {file.filename}
+                                        </Link>
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</div>
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button
-                                        onClick={() => downloadFile(file.id, file.filename)}
-                                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-                                    >
-                                        Download
-                                    </button>
-                                    <button
-                                        onClick={() => deleteFile(file.id)}
-                                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
-                                    >
-                                        Delete
-                                    </button>
+                                    <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition">Download</button>
+                                    <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
                                 </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )}
 
                 {/* + BUTTON */}
                 <button

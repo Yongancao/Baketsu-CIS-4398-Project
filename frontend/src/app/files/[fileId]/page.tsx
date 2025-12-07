@@ -1,11 +1,12 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function FilePreviewPage() {
-    const { fileId } = useParams();   // ✅ Must use in client components
+    const { fileId } = useParams();
+    const router = useRouter();
 
     const [fileData, setFileData] = useState<any>(null);
     const [textContent, setTextContent] = useState("");
@@ -13,10 +14,54 @@ export default function FilePreviewPage() {
     const [error, setError] = useState("");
 
     // File type helpers
-    const isImage = (name: string) => /\.(png|jpg|jpeg|gif|webp)$/i.test(name);
+    const isImage = (name: string) => /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(name);
     const isPDF = (name: string) => /\.pdf$/i.test(name);
-    const isVideo = (name: string) => /\.(mp4|mov|webm)$/i.test(name);
-    const isText = (name: string) => /\.(txt|md|log)$/i.test(name);
+    const isVideo = (name: string) => /\.(mp4|mov|webm|avi|mkv)$/i.test(name);
+    const isAudio = (name: string) => /\.(mp3|wav|ogg|m4a)$/i.test(name);
+    const isText = (name: string) => /\.(txt|md|log|json|xml|csv|html|css|js|ts|tsx|jsx|py|java|c|cpp|h|yml|yaml)$/i.test(name);
+
+    async function handleDownload() {
+        const token = localStorage.getItem("access_token");
+        if (!token || !fileData) return;
+
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/files/${fileId}/download`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            const data = await res.json();
+            
+            const link = document.createElement("a");
+            link.href = data.download_url;
+            link.download = fileData.filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (err) {
+            console.error("Download failed:", err);
+            alert("Failed to download file");
+        }
+    }
+
+    async function handleDelete() {
+        if (!confirm(`Are you sure you want to delete "${fileData.filename}"?`)) return;
+
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        try {
+            await fetch(`http://127.0.0.1:8000/files/${fileId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            alert("File deleted successfully");
+            router.push("/files");
+        } catch (err) {
+            console.error("Delete failed:", err);
+            alert("Failed to delete file");
+        }
+    }
 
     useEffect(() => {
         if (!fileId) {
@@ -47,9 +92,15 @@ export default function FilePreviewPage() {
 
                 // If it's text, fetch raw content from presigned URL
                 if (isText(data.filename)) {
-                    const textRes = await fetch(data.preview_url);
-                    const text = await textRes.text();
-                    setTextContent(text);
+                    try {
+                        const textRes = await fetch(data.preview_url);
+                        if (textRes.ok) {
+                            const text = await textRes.text();
+                            setTextContent(text);
+                        }
+                    } catch (err) {
+                        console.error("Failed to load text content:", err);
+                    }
                 }
             })
             .catch((err) => {
@@ -66,17 +117,34 @@ export default function FilePreviewPage() {
 
     return (
         <div className="p-8 pt-24">
-            <Link href="/files" className="text-blue-500 underline">
-                ← Back to Files
-            </Link>
+            <div className="flex justify-between items-center mb-4">
+                <Link href="/files" className="text-blue-500 hover:text-blue-700 underline">
+                    ← Back to Files
+                </Link>
+                
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleDownload}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                    >
+                        Download
+                    </button>
+                    <button
+                        onClick={handleDelete}
+                        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
 
-            <h1 className="text-2xl font-semibold mt-4">{fileData.filename}</h1>
-            <p className="text-gray-600">
+            <h1 className="text-2xl font-semibold mt-4 text-gray-900 dark:text-white">{fileData.filename}</h1>
+            <p className="text-gray-600 dark:text-gray-400">
                 {(fileData.file_size / 1024).toFixed(1)} KB • Uploaded{" "}
                 {fileData.uploaded_at}
             </p>
 
-            <div className="mt-6 border rounded-lg p-4 bg-gray-50">
+            <div className="mt-6 border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
 
                 {/* IMAGE */}
                 {isImage(fileData.filename) && (
@@ -103,26 +171,51 @@ export default function FilePreviewPage() {
                     />
                 )}
 
+                {/* AUDIO */}
+                {isAudio(fileData.filename) && (
+                    <audio
+                        src={fileData.preview_url}
+                        controls
+                        className="w-full"
+                    />
+                )}
+
                 {/* TEXT */}
                 {isText(fileData.filename) && (
-                    <pre className="whitespace-pre-wrap text-sm p-4 bg-white border rounded">
-                        {textContent}
-                    </pre>
+                    <div>
+                        {textContent ? (
+                            <pre className="whitespace-pre-wrap text-sm p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-gray-900 dark:text-gray-100 overflow-x-auto">
+                                {textContent}
+                            </pre>
+                        ) : (
+                            <div className="text-center p-6">
+                                <p className="text-gray-600 dark:text-gray-400 mb-4">Unable to preview text file</p>
+                                <button
+                                    onClick={handleDownload}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                                >
+                                    Download to View
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {/* OTHER FILE TYPES */}
                 {!isImage(fileData.filename) &&
                     !isPDF(fileData.filename) &&
                     !isVideo(fileData.filename) &&
+                    !isAudio(fileData.filename) &&
                     !isText(fileData.filename) && (
                         <div className="text-center p-6">
-                            <a
-                                href={fileData.preview_url}
-                                download
-                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            <div className="text-6xl mb-4">📄</div>
+                            <p className="text-gray-600 dark:text-gray-400 mb-4">Preview not available for this file type</p>
+                            <button
+                                onClick={handleDownload}
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
                             >
-                                Download File
-                            </a>
+                                Download to View
+                            </button>
                         </div>
                     )}
             </div>
