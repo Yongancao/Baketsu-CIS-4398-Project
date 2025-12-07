@@ -36,3 +36,17 @@ def generate_presigned_url(key: str, expires_in: int = 300):
         Params={"Bucket": AWS_BUCKET_NAME, "Key": key},
         ExpiresIn=expires_in
     )
+
+def generate_download_url(key: str, filename: str, expires_in: int = 300):
+    """
+    Generate a presigned URL for downloading a file with proper Content-Disposition header.
+    """
+    return s3.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": AWS_BUCKET_NAME,
+            "Key": key,
+            "ResponseContentDisposition": f'attachment; filename="{filename}"'
+        },
+        ExpiresIn=expires_in
+    )
