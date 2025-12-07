@@ -13,3 +13,5 @@ frontend/node_modules/
 
 # Build output
 frontend/.next/
+
+/infra/node_modules
