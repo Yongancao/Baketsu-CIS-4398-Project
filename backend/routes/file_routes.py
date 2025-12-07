@@ -7,7 +7,7 @@ from core.security import get_current_user
 from core.database import get_db
 from models import User, UserFile, FileStorageHistory
 from schemas.file_schemas import FileDetailResponse, FileListItem
-from services.s3_client import upload_file_to_s3, delete_file_from_s3, generate_presigned_url
+from services.s3_client import upload_file_to_s3, delete_file_from_s3, generate_presigned_url, generate_download_url
 from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/files", tags=["Files"])
@@ -194,6 +194,25 @@ async def delete_file(
     db.commit()
 
     return {"message": "File deleted successfully"}
+
+@router.get("/{file_id}/download")
+async def download_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    file_record = db.query(UserFile).filter(
+        UserFile.user_id == current_user.id,
+        UserFile.id == file_id
+    ).first()
+
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Generate download URL with proper Content-Disposition header
+    download_url = generate_download_url(file_record.file_key, file_record.filename)
+
+    return {"download_url": download_url}
 
 @router.get("/list", response_model=List[FileListItem])
 async def list_files(

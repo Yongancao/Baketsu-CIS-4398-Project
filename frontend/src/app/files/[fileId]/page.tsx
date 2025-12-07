@@ -65,7 +65,7 @@ export default function FilePreviewPage() {
     if (!fileData) return <p className="p-8">File not found.</p>;
 
     return (
-        <div className="p-8">
+        <div className="p-8 pt-24">
             <Link href="/files" className="text-blue-500 underline">
                 ← Back to Files
             </Link>
