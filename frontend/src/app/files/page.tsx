@@ -45,26 +45,6 @@ export default function FilesPage() {
         document.body.removeChild(link);
     }
 
-    async function downloadFile(id: number, filename: string) {
-        const token = localStorage.getItem("access_token");
-
-        const res = await fetch(`http://127.0.0.1:8000/files/${id}/download`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
-
-        const data = await res.json();
-        
-        // Create a temporary link and trigger download
-        const link = document.createElement("a");
-        link.href = data.download_url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-
     // ----------------------
     // CREATE FOLDER
     // ----------------------
