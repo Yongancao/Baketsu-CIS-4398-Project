@@ -16,4 +16,5 @@ class Folder(Base):
     files = relationship("UserFile", back_populates="folder")
 
     # A folder contains subfolders
-    children = relationship("Folder")
+    parent = relationship("Folder", remote_side=[id], back_populates="children")
+    children = relationship("Folder", back_populates="parent")

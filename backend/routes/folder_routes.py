@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from core.security import get_current_user
 from models.folder import Folder
+from models.file import UserFile
 
 router = APIRouter(prefix="/folders", tags=["Folders"])
 
@@ -44,3 +45,28 @@ def create_folder(
     db.refresh(folder)
 
     return folder
+
+@router.get("/list")
+def list_folders(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    folders = db.query(Folder).filter(Folder.user_id == current_user.id).all()
+    return folders
+
+@router.post("/move")
+def move_file(
+    file_id: int,
+    folder_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    file_record = db.query(UserFile).filter(UserFile.id == file_id, UserFile.user_id == current_user.id).first()
+    if not file_record:
+        raise HTTPException(404, "File not found")
+
+    file_record.folder_id = folder_id
+    db.commit()
+    db.refresh(file_record)
+
+    return {"message": "File moved successfully", "file_id": file_id, "folder_id": folder_id}
