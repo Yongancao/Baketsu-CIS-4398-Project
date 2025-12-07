@@ -97,7 +97,32 @@ export default function FilesPage() {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 const fileList = await filesRes.json();
-                setFiles(fileList);
+
+                const enhancedFiles = await Promise.all(
+                    fileList.map(async (file: any) => {
+                        if (!isImageFile(file.filename)) return file;
+
+                        try {
+                            const res = await fetch(
+                                `http://127.0.0.1:8000/files/${file.id}`,
+                                { headers: { Authorization: `Bearer ${token}` } }
+                            );
+
+                            if (!res.ok) return file;
+
+                            const json = await res.json();
+
+                            return {
+                                ...file,
+                                thumbnailUrl: json.preview_url,
+                            };
+                        } catch {
+                            return file;
+                        }
+                    })
+                );
+
+                setFiles(enhancedFiles);
 
                 const foldersRes = await fetch("http://127.0.0.1:8000/folders/list", {
                     headers: { Authorization: `Bearer ${token}` },
