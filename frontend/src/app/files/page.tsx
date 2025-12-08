@@ -10,6 +10,9 @@ export default function FilesPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
+    const [searchQuery, setSearchQuery] = useState("");
+    const [fileTypeFilter, setFileTypeFilter] = useState<"all" | "images" | "videos" | "documents" | "audio" | "other">("all");
+    const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
     const [viewMode, setViewMode] = useState<"small" | "medium" | "large" | "details" | "list">(() => {
         if (typeof window !== "undefined") {
             return (localStorage.getItem("filesViewMode") as any) || "medium";
@@ -20,6 +23,55 @@ export default function FilesPage() {
     const handleViewModeChange = (mode: "small" | "medium" | "large" | "details" | "list") => {
         setViewMode(mode);
         localStorage.setItem("filesViewMode", mode);
+    };
+
+    // ----------------------
+    // FILTER FUNCTIONS
+    // ----------------------
+    const getFileType = (filename: string): "images" | "videos" | "documents" | "audio" | "other" => {
+        const ext = filename.toLowerCase();
+        if (/\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(ext)) return "images";
+        if (/\.(mp4|mov|webm|avi|mkv)$/i.test(ext)) return "videos";
+        if (/\.(pdf|doc|docx|txt|md|csv|xlsx|xls|ppt|pptx)$/i.test(ext)) return "documents";
+        if (/\.(mp3|wav|ogg|m4a|flac)$/i.test(ext)) return "audio";
+        return "other";
+    };
+
+    const filteredFiles = files.filter(file => {
+        // Search filter
+        if (searchQuery && !file.filename.toLowerCase().includes(searchQuery.toLowerCase())) {
+            return false;
+        }
+
+        // File type filter
+        if (fileTypeFilter !== "all" && getFileType(file.filename) !== fileTypeFilter) {
+            return false;
+        }
+
+        // Date range filter
+        if (dateRange.start || dateRange.end) {
+            const fileDate = file.uploaded_at ? new Date(file.uploaded_at) : null;
+            if (!fileDate) return false;
+
+            if (dateRange.start) {
+                const startDate = new Date(dateRange.start);
+                if (fileDate < startDate) return false;
+            }
+
+            if (dateRange.end) {
+                const endDate = new Date(dateRange.end);
+                endDate.setHours(23, 59, 59, 999); // Include the entire end day
+                if (fileDate > endDate) return false;
+            }
+        }
+
+        return true;
+    });
+
+    const clearFilters = () => {
+        setSearchQuery("");
+        setFileTypeFilter("all");
+        setDateRange({ start: "", end: "" });
     };
 
     // ----------------------
@@ -38,10 +90,10 @@ export default function FilesPage() {
     };
 
     const selectAllFiles = () => {
-        if (selectedFiles.size === files.length) {
+        if (selectedFiles.size === filteredFiles.length) {
             setSelectedFiles(new Set());
         } else {
-            setSelectedFiles(new Set(files.map(f => f.id)));
+            setSelectedFiles(new Set(filteredFiles.map(f => f.id)));
         }
     };
 
@@ -299,6 +351,73 @@ export default function FilesPage() {
     return (
         <ProtectedPage>
             <div className="p-8 pt-24 relative min-h-screen">
+                {/* Search and Filter Bar */}
+                <div className="mb-6 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        {/* Search Input */}
+                        <div className="flex-1">
+                            <input
+                                type="text"
+                                placeholder="Search files by name..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                        </div>
+
+                        {/* File Type Filter */}
+                        <div className="w-full md:w-48">
+                            <select
+                                value={fileTypeFilter}
+                                onChange={(e) => setFileTypeFilter(e.target.value as any)}
+                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="all">All Types</option>
+                                <option value="images">Images</option>
+                                <option value="videos">Videos</option>
+                                <option value="documents">Documents</option>
+                                <option value="audio">Audio</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        {/* Date Range Filters */}
+                        <div className="flex gap-2">
+                            <input
+                                type="date"
+                                placeholder="Start Date"
+                                value={dateRange.start}
+                                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                            />
+                            <input
+                                type="date"
+                                placeholder="End Date"
+                                value={dateRange.end}
+                                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        {/* Clear Filters Button */}
+                        {(searchQuery || fileTypeFilter !== "all" || dateRange.start || dateRange.end) && (
+                            <button
+                                onClick={clearFilters}
+                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition whitespace-nowrap"
+                            >
+                                Clear Filters
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Results Count */}
+                    <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                        Showing {filteredFiles.length} of {files.length} files
+                        {searchQuery && ` matching "${searchQuery}"`}
+                        {fileTypeFilter !== "all" && ` in ${fileTypeFilter}`}
+                    </div>
+                </div>
+
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-4">
                         <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Your Files & Folders</h1>
@@ -330,12 +449,12 @@ export default function FilesPage() {
                                 </button>
                             </>
                         )}
-                        {files.length > 0 && (
+                        {filteredFiles.length > 0 && (
                             <button
                                 onClick={selectAllFiles}
                                 className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition text-gray-900 dark:text-white"
                             >
-                                {selectedFiles.size === files.length ? "Deselect All" : "Select All"}
+                                {selectedFiles.size === filteredFiles.length ? "Deselect All" : "Select All"}
                             </button>
                         )}
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</label>
@@ -367,7 +486,7 @@ export default function FilesPage() {
                                 <div className="text-xs truncate text-gray-900 dark:text-gray-100 text-center" title={folder.name}>{folder.name}</div>
                             </div>
                         ))}
-                        {files.map((file) => (
+                        {filteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
                                 draggable
@@ -407,10 +526,10 @@ export default function FilesPage() {
                                 onDragOver={onDragOver}
                             >
                                 <span className="text-6xl">📁</span>
-                                <div className="mt-2 font-medium text-gray-900 dark:text-gray-100">{folder.name}</div>
+                                <div className="text-xl font-medium text-gray-900 dark:text-gray-100">{folder.name}</div>
                             </div>
                         ))}
-                        {files.map((file) => (
+                        {filteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
                                 draggable
@@ -462,7 +581,7 @@ export default function FilesPage() {
                                 <div className="mt-3 font-medium text-lg text-gray-900 dark:text-gray-100">{folder.name}</div>
                             </div>
                         ))}
-                        {files.map((file) => (
+                        {filteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
                                 draggable
@@ -509,7 +628,7 @@ export default function FilesPage() {
                                     <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100 w-12">
                                         <input
                                             type="checkbox"
-                                            checked={files.length > 0 && selectedFiles.size === files.length}
+                                            checked={filteredFiles.length > 0 && selectedFiles.size === filteredFiles.length}
                                             onChange={selectAllFiles}
                                             className="w-4 h-4 cursor-pointer"
                                         />
@@ -541,7 +660,7 @@ export default function FilesPage() {
                                         <td className="p-3"></td>
                                     </tr>
                                 ))}
-                                {files.map((file) => (
+                                {filteredFiles.map((file) => (
                                     <tr 
                                         key={file.id} 
                                         draggable
@@ -604,7 +723,7 @@ export default function FilesPage() {
                                 </div>
                             </div>
                         ))}
-                        {files.map((file) => (
+                        {filteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
                                 draggable
