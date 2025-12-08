@@ -9,6 +9,7 @@ export default function FilesPage() {
     const [folders, setFolders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
     const [viewMode, setViewMode] = useState<"small" | "medium" | "large" | "details" | "list">(() => {
         if (typeof window !== "undefined") {
             return (localStorage.getItem("filesViewMode") as any) || "medium";
@@ -20,6 +21,99 @@ export default function FilesPage() {
         setViewMode(mode);
         localStorage.setItem("filesViewMode", mode);
     };
+
+    // ----------------------
+    // MULTI-SELECT FUNCTIONS
+    // ----------------------
+    const toggleFileSelection = (fileId: number) => {
+        setSelectedFiles(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(fileId)) {
+                newSet.delete(fileId);
+            } else {
+                newSet.add(fileId);
+            }
+            return newSet;
+        });
+    };
+
+    const selectAllFiles = () => {
+        if (selectedFiles.size === files.length) {
+            setSelectedFiles(new Set());
+        } else {
+            setSelectedFiles(new Set(files.map(f => f.id)));
+        }
+    };
+
+    const clearSelection = () => {
+        setSelectedFiles(new Set());
+    };
+
+    async function deleteSelectedFiles() {
+        if (selectedFiles.size === 0) return;
+        
+        if (!confirm(`Delete ${selectedFiles.size} selected file(s)?`)) return;
+
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        try {
+            await Promise.all(
+                Array.from(selectedFiles).map(id =>
+                    fetch(`http://127.0.0.1:8000/files/${id}`, {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` },
+                    })
+                )
+            );
+
+            setFiles(prev => prev.filter(file => !selectedFiles.has(file.id)));
+            setSelectedFiles(new Set());
+        } catch (err) {
+            console.error("Failed to delete files:", err);
+            alert("Failed to delete some files");
+        }
+    }
+
+    async function downloadSelectedFiles() {
+        if (selectedFiles.size === 0) return;
+
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        const selectedFileObjects = files.filter(f => selectedFiles.has(f.id));
+
+        for (const file of selectedFileObjects) {
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/files/${file.id}/download`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
+                const data = await res.json();
+                
+                // Create link and trigger download
+                const link = document.createElement("a");
+                link.href = data.download_url;
+                link.download = file.filename;
+                link.style.display = "none";
+                document.body.appendChild(link);
+                
+                // Trigger download
+                link.click();
+                
+                // Wait longer before removing and starting next download
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Remove link after delay
+                document.body.removeChild(link);
+            } catch (err) {
+                console.error(`Failed to download ${file.filename}:`, err);
+                alert(`Failed to download ${file.filename}`);
+            }
+        }
+        
+        alert(`${selectedFileObjects.length} file(s) download initiated`);
+    }
 
     // ----------------------
     // DELETE FILE
@@ -206,9 +300,44 @@ export default function FilesPage() {
         <ProtectedPage>
             <div className="p-8 pt-24 relative min-h-screen">
                 <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Your Files & Folders</h1>
+                    <div className="flex items-center gap-4">
+                        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Your Files & Folders</h1>
+                        {selectedFiles.size > 0 && (
+                            <span className="text-sm text-gray-600 dark:text-gray-400">({selectedFiles.size} selected)</span>
+                        )}
+                    </div>
                     
                     <div className="flex items-center gap-4">
+                        {selectedFiles.size > 0 && (
+                            <>
+                                <button
+                                    onClick={downloadSelectedFiles}
+                                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                                >
+                                    Download ({selectedFiles.size})
+                                </button>
+                                <button
+                                    onClick={deleteSelectedFiles}
+                                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+                                >
+                                    Delete ({selectedFiles.size})
+                                </button>
+                                <button
+                                    onClick={clearSelection}
+                                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+                                >
+                                    Clear
+                                </button>
+                            </>
+                        )}
+                        {files.length > 0 && (
+                            <button
+                                onClick={selectAllFiles}
+                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition text-gray-900 dark:text-white"
+                            >
+                                {selectedFiles.size === files.length ? "Deselect All" : "Select All"}
+                            </button>
+                        )}
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</label>
                         <select 
                             value={viewMode}
@@ -243,8 +372,17 @@ export default function FilesPage() {
                                 key={file.id} 
                                 draggable
                                 onDragStart={(e) => onDragStart(e, file.id)}
-                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab"
+                                className={`border rounded-lg p-2 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab relative ${
+                                    selectedFiles.has(file.id) ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-gray-200 dark:border-gray-700'
+                                }`}
                             >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedFiles.has(file.id)}
+                                    onChange={() => toggleFileSelection(file.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute top-1 left-1 w-4 h-4 cursor-pointer z-10"
+                                />
                                 <Link href={`/files/${file.id}`} className="block">
                                     {file.thumbnailUrl ? (
                                         <img src={file.thumbnailUrl} alt={file.filename} className="w-full h-16 object-cover rounded mb-1" />
@@ -277,8 +415,17 @@ export default function FilesPage() {
                                 key={file.id} 
                                 draggable
                                 onDragStart={(e) => onDragStart(e, file.id)}
-                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab"
+                                className={`border rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab relative ${
+                                    selectedFiles.has(file.id) ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-gray-200 dark:border-gray-700'
+                                }`}
                             >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedFiles.has(file.id)}
+                                    onChange={() => toggleFileSelection(file.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute top-2 left-2 w-5 h-5 cursor-pointer z-10"
+                                />
                                 <Link href={`/files/${file.id}`} className="block mb-2">
                                     {file.thumbnailUrl ? (
                                         <img src={file.thumbnailUrl} alt={file.filename} className="w-full h-40 object-cover rounded mb-2" />
@@ -320,8 +467,17 @@ export default function FilesPage() {
                                 key={file.id} 
                                 draggable
                                 onDragStart={(e) => onDragStart(e, file.id)}
-                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab"
+                                className={`border rounded-lg p-6 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab relative ${
+                                    selectedFiles.has(file.id) ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-gray-200 dark:border-gray-700'
+                                }`}
                             >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedFiles.has(file.id)}
+                                    onChange={() => toggleFileSelection(file.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute top-3 left-3 w-5 h-5 cursor-pointer z-10"
+                                />
                                 <Link href={`/files/${file.id}`} className="block mb-3">
                                     {file.thumbnailUrl ? (
                                         <img src={file.thumbnailUrl} alt={file.filename} className="w-full h-64 object-cover rounded mb-3" />
@@ -350,6 +506,14 @@ export default function FilesPage() {
                         <table className="w-full">
                             <thead className="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                                 <tr>
+                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100 w-12">
+                                        <input
+                                            type="checkbox"
+                                            checked={files.length > 0 && selectedFiles.size === files.length}
+                                            onChange={selectAllFiles}
+                                            className="w-4 h-4 cursor-pointer"
+                                        />
+                                    </th>
                                     <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Preview</th>
                                     <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Name</th>
                                     <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Size</th>
@@ -365,6 +529,7 @@ export default function FilesPage() {
                                         onDrop={(e) => onDrop(e, folder.id)}
                                         onDragOver={onDragOver}
                                     >
+                                        <td className="p-3"></td>
                                         <td className="p-3">
                                             <div className="w-12 h-12 flex items-center justify-center text-2xl">📁</div>
                                         </td>
@@ -381,8 +546,19 @@ export default function FilesPage() {
                                         key={file.id} 
                                         draggable
                                         onDragStart={(e) => onDragStart(e, file.id)}
-                                        className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-grab"
+                                        className={`border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-grab ${
+                                            selectedFiles.has(file.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                                        }`}
                                     >
+                                        <td className="p-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedFiles.has(file.id)}
+                                                onChange={() => toggleFileSelection(file.id)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-4 h-4 cursor-pointer"
+                                            />
+                                        </td>
                                         <td className="p-3">
                                             <Link href={`/files/${file.id}`}>
                                                 {file.thumbnailUrl ? (
@@ -433,8 +609,17 @@ export default function FilesPage() {
                                 key={file.id} 
                                 draggable
                                 onDragStart={(e) => onDragStart(e, file.id)}
-                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition flex items-center justify-between bg-white dark:bg-gray-800 cursor-grab"
+                                className={`border rounded-lg p-4 shadow-sm hover:shadow-md transition flex items-center justify-between bg-white dark:bg-gray-800 cursor-grab ${
+                                    selectedFiles.has(file.id) ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-gray-200 dark:border-gray-700'
+                                }`}
                             >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedFiles.has(file.id)}
+                                    onChange={() => toggleFileSelection(file.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-5 h-5 cursor-pointer mr-4"
+                                />
                                 <div className="flex items-center gap-4 flex-1 min-w-0">
                                     <Link href={`/files/${file.id}`}>
                                         {file.thumbnailUrl ? (
