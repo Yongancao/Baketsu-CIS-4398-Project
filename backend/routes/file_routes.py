@@ -39,10 +39,7 @@ async def upload_files(
         if len(file_bytes) == 0:
             raise HTTPException(status_code=400, detail=f"File {filename} is empty")
 
-        # ✅ Upload to S3
-        upload_file_to_s3(buffer, key)
-
-        # ✅ Save metadata
+        # ✅ Save metadata to DB first
         db_file = UserFile(
             user_id=current_user.id,
             filename=filename,
@@ -51,8 +48,22 @@ async def upload_files(
             folder_id=folder_id
         )
         db.add(db_file)
-        db.commit()
-        db.refresh(db_file)
+        
+        try:
+            db.commit()
+            db.refresh(db_file)
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        
+        # ✅ Only upload to S3 after successful DB commit
+        try:
+            upload_file_to_s3(buffer, key)
+        except Exception as e:
+            # If S3 upload fails, delete the DB record
+            db.delete(db_file)
+            db.commit()
+            raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
 
         uploaded.append({
             "file_id": db_file.id,
@@ -219,6 +230,8 @@ async def list_files(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+    from datetime import timezone
+    
     # Get all files for this user (deleted files are removed from this table)
     files = (
         db.query(UserFile)
@@ -227,7 +240,30 @@ async def list_files(
         .all()
     )
 
-    return files
+    # Convert uploaded_at to UTC ISO format for each file
+    result = []
+    for file in files:
+        uploaded_at = file.uploaded_at
+        if isinstance(uploaded_at, str):
+            try:
+                dt = datetime.strptime(uploaded_at, "%Y-%m-%d %H:%M:%S")
+                dt_utc = dt.replace(tzinfo=timezone.utc)
+                uploaded_at = dt_utc.isoformat()
+            except ValueError:
+                pass
+        elif isinstance(uploaded_at, datetime):
+            if uploaded_at.tzinfo is None:
+                uploaded_at = uploaded_at.replace(tzinfo=timezone.utc)
+            uploaded_at = uploaded_at.isoformat()
+        
+        result.append({
+            "id": file.id,
+            "filename": file.filename,
+            "file_size": file.file_size,
+            "uploaded_at": uploaded_at
+        })
+    
+    return result
 
 @router.patch("/{file_id}/rename")
 async def rename_file(
@@ -306,19 +342,26 @@ async def get_file_details(
     # Generate preview URL
     preview_url = generate_presigned_url(file_record.file_key)
 
-    # Handle uploaded_at (SQLite stores DateTime as string)
+    # Handle uploaded_at - ensure UTC timezone
     raw_time = file_record.uploaded_at
 
     if isinstance(raw_time, str):
-        # Convert "2025-12-03 17:13:43" -> ISO format
+        # Convert "2025-12-03 17:13:43" -> ISO format with UTC timezone
         try:
+            from datetime import timezone
             dt = datetime.strptime(raw_time, "%Y-%m-%d %H:%M:%S")
-            uploaded_at = dt.isoformat()
+            # Assume stored time is UTC and make it timezone-aware
+            dt_utc = dt.replace(tzinfo=timezone.utc)
+            uploaded_at = dt_utc.isoformat()
         except ValueError:
             # If parsing fails, fallback to raw string
             uploaded_at = raw_time
 
     elif isinstance(raw_time, datetime):
+        # Ensure datetime is timezone-aware (UTC)
+        from datetime import timezone
+        if raw_time.tzinfo is None:
+            raw_time = raw_time.replace(tzinfo=timezone.utc)
         uploaded_at = raw_time.isoformat()
 
     else:

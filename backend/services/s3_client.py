@@ -29,11 +29,34 @@ def delete_file_from_s3(key: str):
 
 def generate_presigned_url(key: str, expires_in: int = 300):
     """
-    Generate a temporary URL that allows the user to access S3 file for preview or download.
+    Generate a temporary URL that allows the user to access S3 file for preview (inline viewing).
+    Forces inline content disposition and proper content type.
     """
+    # Determine content type based on file extension
+    content_type = "application/octet-stream"
+    if key.lower().endswith('.pdf'):
+        content_type = "application/pdf"
+    elif key.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')):
+        content_type = "image/jpeg" if key.lower().endswith(('.jpg', '.jpeg')) else f"image/{key.split('.')[-1]}"
+    elif key.lower().endswith(('.mp4', '.webm')):
+        content_type = f"video/{key.split('.')[-1]}"
+    elif key.lower().endswith(('.mp3', '.wav', '.ogg')):
+        content_type = f"audio/{key.split('.')[-1]}"
+    elif key.lower().endswith(('.txt', '.md', '.log')):
+        content_type = "text/plain"
+    elif key.lower().endswith(('.html', '.htm')):
+        content_type = "text/html"
+    elif key.lower().endswith(('.json',)):
+        content_type = "application/json"
+    
     return s3.generate_presigned_url(
         "get_object",
-        Params={"Bucket": AWS_BUCKET_NAME, "Key": key},
+        Params={
+            "Bucket": AWS_BUCKET_NAME,
+            "Key": key,
+            "ResponseContentDisposition": "inline",
+            "ResponseContentType": content_type
+        },
         ExpiresIn=expires_in
     )
 
