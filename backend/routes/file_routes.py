@@ -31,6 +31,24 @@ async def upload_files(
         else:
             key = f"users/{current_user.id}/{filename}"
 
+        # Check if file with same name already exists for this user in the same folder
+        existing_file = (
+            db.query(UserFile)
+            .filter(
+                UserFile.user_id == current_user.id,
+                UserFile.filename == filename,
+                UserFile.folder_id == folder_id,
+                UserFile.deleted_at.is_(None)
+            )
+            .first()
+        )
+        
+        if existing_file:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"File '{filename}' already exists in this location. Please rename the file or delete the existing one first."
+            )
+
         # ✅ Read file into memory
         file_bytes = await file.read()
         buffer = BytesIO(file_bytes)
@@ -290,6 +308,26 @@ async def rename_file(
     
     if not file_record:
         raise HTTPException(status_code=404, detail="File not found")
+    
+    # Check if a file with the new name already exists in the same location
+    # (excluding the current file being renamed)
+    existing_file = (
+        db.query(UserFile)
+        .filter(
+            UserFile.user_id == current_user.id,
+            UserFile.filename == new_filename,
+            UserFile.folder_id == file_record.folder_id,
+            UserFile.deleted_at.is_(None),
+            UserFile.id != file_id  # Exclude the current file
+        )
+        .first()
+    )
+    
+    if existing_file:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File '{new_filename}' already exists in this location. Please choose a different name."
+        )
     
     old_key = file_record.file_key
     
