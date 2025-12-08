@@ -53,7 +53,7 @@ export default function LoginPage() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Username"
-          className="border p-2 w-64 mb-3 rounded-lg"
+          className="border p-2 m-2 w-64 mb-3 rounded-lg"
         />
 
         <input
@@ -61,13 +61,13 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
-          className="border p-2 w-64 mb-3 rounded-lg"
+          className="border p-2 m-2 w-64 mb-3 rounded-lg"
         />
 
         <button
           type="submit"
           disabled={loading}
-          className="bg-[#4267B2] text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-60"
+          className="bg-[#4267B2] text-white px-4 py-2 m-2 rounded-lg hover:bg-gray-800 disabled:opacity-60"
         >
           {loading ? "Logging in..." : "Login"}
         </button>
