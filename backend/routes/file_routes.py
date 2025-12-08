@@ -73,7 +73,7 @@ async def upload_files(
         
         if existing_file:
             raise HTTPException(
-                status_code=400,
+                status_code=400, 
                 detail=f"File '{filename}' already exists in this location. Please rename the file or delete the existing one first."
             )
 
@@ -359,6 +359,7 @@ async def rename_file(
             status_code=400,
             detail=f"File '{new_filename}' already exists in this location. Please choose a different name."
         )
+    
     old_key = file_record.file_key
     
     # Generate new S3 key with the new filename
