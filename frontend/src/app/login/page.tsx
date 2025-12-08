@@ -1,4 +1,3 @@
-// app/login/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -6,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,23 +16,35 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       const res = await fetch("http://127.0.0.1:8000/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email: email.toLowerCase(), password }),
       });
+
       if (!res.ok) {
         const errData = await res.json();
-        setError(errData.detail || "Invalid credentials");
+
+        if (res.status === 403) {
+          setError(
+            "Your email is not verified. Please check your inbox for a verification link."
+          );
+        } else {
+          setError(errData.detail || "Invalid credentials");
+        }
         return;
       }
+
       const data = await res.json();
-      // Store JWT (MVP: localStorage)
+
+      // Store JWT (MVP)
       login(data.access_token);
-      // Redirect to protected upload page
+
+      // Redirect to dashboard
       router.push("/dashboard");
-    } catch (err: any) {
+    } catch (err) {
       setError("Login failed");
     } finally {
       setLoading(false);
@@ -48,14 +59,16 @@ export default function LoginPage() {
       >
         <h1 className="text-2xl font-bold mb-4">Login</h1>
 
+        {/* Email */}
         <input
-          type="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Username"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
           className="border p-2 m-2 w-64 mb-3 rounded-lg"
         />
 
+        {/* Password */}
         <input
           type="password"
           value={password}
@@ -72,8 +85,7 @@ export default function LoginPage() {
           {loading ? "Logging in..." : "Login"}
         </button>
 
-  {error && <p className="text-red-500 mt-2">{error}</p>}
-  <p className="text-xs mt-4 text-gray-500"></p>
+        {error && <p className="text-red-500 mt-2">{error}</p>}
       </form>
     </div>
   );
