@@ -13,8 +13,18 @@ export default function FilesPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [fileTypeFilter, setFileTypeFilter] = useState<"all" | "images" | "videos" | "documents" | "audio" | "other">("all");
     const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
-    const [sortBy, setSortBy] = useState<"name" | "size" | "date">("name");
-    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+    const [sortBy, setSortBy] = useState<"name" | "size" | "date">(() => {
+        if (typeof window !== "undefined") {
+            return (localStorage.getItem("filesSortBy") as any) || "name";
+        }
+        return "name";
+    });
+    const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => {
+        if (typeof window !== "undefined") {
+            return (localStorage.getItem("filesSortOrder") as any) || "asc";
+        }
+        return "asc";
+    });
     const [renamingFileId, setRenamingFileId] = useState<number | null>(null);
     const [renameValue, setRenameValue] = useState("");
     const [viewMode, setViewMode] = useState<"small" | "medium" | "large" | "details" | "list">(() => {
@@ -27,6 +37,27 @@ export default function FilesPage() {
     const handleViewModeChange = (mode: "small" | "medium" | "large" | "details" | "list") => {
         setViewMode(mode);
         localStorage.setItem("filesViewMode", mode);
+    };
+
+    // ----------------------
+    // DATE FORMATTING
+    // ----------------------
+    const formatDateTime = (dateString: string | null | undefined): string => {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            // Format: MM/DD/YYYY HH:MM (24-hour format)
+            return date.toLocaleString('en-US', {
+                month: '2-digit',
+                day: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+        } catch {
+            return 'N/A';
+        }
     };
 
     // ----------------------
@@ -102,7 +133,11 @@ export default function FilesPage() {
     });
 
     const toggleSortOrder = () => {
-        setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+        setSortOrder(prev => {
+            const newOrder = prev === "asc" ? "desc" : "asc";
+            localStorage.setItem("filesSortOrder", newOrder);
+            return newOrder;
+        });
     };
 
     // ----------------------
@@ -512,7 +547,11 @@ export default function FilesPage() {
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
                     <select
                         value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as any)}
+                        onChange={(e) => {
+                            const newSortBy = e.target.value as any;
+                            setSortBy(newSortBy);
+                            localStorage.setItem("filesSortBy", newSortBy);
+                        }}
                         className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 text-sm"
                     >
                         <option value="name">Name</option>
@@ -886,7 +925,7 @@ export default function FilesPage() {
                                             )}
                                         </td>
                                         <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</td>
-                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{file.uploaded_at ? new Date(file.uploaded_at).toLocaleDateString() : 'N/A'}</td>
+                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{formatDateTime(file.uploaded_at)}</td>
                                         <td className="p-3 text-right">
                                             <div className="flex gap-2 justify-end">
                                                 <button onClick={() => startRename(file)} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-sm" title="Rename">✏️</button>

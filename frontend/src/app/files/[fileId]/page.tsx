@@ -22,6 +22,25 @@ export default function FilePreviewPage() {
     const isAudio = (name: string) => /\.(mp3|wav|ogg|m4a)$/i.test(name);
     const isText = (name: string) => /\.(txt|md|log|json|xml|csv|html|css|js|ts|tsx|jsx|py|java|c|cpp|h|yml|yaml)$/i.test(name);
 
+    const formatDateTime = (dateString: string | null | undefined): string => {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            // Format: Month DD, YYYY at HH:MM (24-hour) Timezone
+            return date.toLocaleString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+                timeZoneName: 'short'
+            });
+        } catch {
+            return 'N/A';
+        }
+    };
+
     async function handleDownload() {
         const token = localStorage.getItem("access_token");
         if (!token || !fileData) return;
@@ -227,8 +246,7 @@ export default function FilePreviewPage() {
                 <h1 className="text-2xl font-semibold mt-4 text-gray-900 dark:text-white">{fileData.filename}</h1>
             )}
             <p className="text-gray-600 dark:text-gray-400">
-                {(fileData.file_size / 1024).toFixed(1)} KB • Uploaded{" "}
-                {fileData.uploaded_at}
+                {(fileData.file_size / 1024).toFixed(1)} KB • Uploaded {formatDateTime(fileData.uploaded_at)}
             </p>
 
             <div className="mt-6 border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
@@ -244,7 +262,7 @@ export default function FilePreviewPage() {
                 {/* PDF */}
                 {isPDF(fileData.filename) && (
                     <iframe
-                        src={fileData.preview_url}
+                        src={`${fileData.preview_url}#view=FitH`}
                         className="w-full h-[80vh] rounded-lg"
                     />
                 )}
