@@ -4,7 +4,7 @@ import Link from "next/link";
 import ProtectedPage from "@/components/ProtectedPage";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<{ username: string } | null>(null);
+  const [user, setUser] = useState<{ name: string } | null>(null);
   const [message, setMessage] = useState("");
   const [totalFiles, setTotalFiles] = useState<number | null>(null);
   const [totalBytes, setTotalBytes] = useState<number | null>(null);
@@ -29,7 +29,7 @@ export default function DashboardPage() {
     })
       .then((res) => res.json())
       .then((data) => {
-        if (data.username) setUser(data);
+        if (data.name) setUser(data);
         else setMessage("❌ Invalid or expired token.");
       })
       .catch(() => setMessage("⚠️ Error fetching user info."));
@@ -72,7 +72,7 @@ export default function DashboardPage() {
           <>
             {/* Header */}
             <h1 className="text-3xl font-semibold mb-4">
-              Welcome, {user.username}!
+              Welcome, {user.name}!
             </h1>
 
             {/* Dashboard Stats */}
