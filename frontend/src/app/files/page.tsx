@@ -15,6 +15,8 @@ export default function FilesPage() {
     const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
     const [sortBy, setSortBy] = useState<"name" | "size" | "date">("name");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+    const [renamingFileId, setRenamingFileId] = useState<number | null>(null);
+    const [renameValue, setRenameValue] = useState("");
     const [viewMode, setViewMode] = useState<"small" | "medium" | "large" | "details" | "list">(() => {
         if (typeof window !== "undefined") {
             return (localStorage.getItem("filesViewMode") as any) || "medium";
@@ -128,6 +130,64 @@ export default function FilesPage() {
 
     const clearSelection = () => {
         setSelectedFiles(new Set());
+    };
+
+    // ----------------------
+    // RENAME FUNCTIONS
+    // ----------------------
+    const startRename = (file: any) => {
+        setRenamingFileId(file.id);
+        // Strip extension from filename for editing
+        const lastDotIndex = file.filename.lastIndexOf('.');
+        const nameWithoutExt = lastDotIndex > 0 ? file.filename.substring(0, lastDotIndex) : file.filename;
+        setRenameValue(nameWithoutExt);
+    };
+
+    const cancelRename = () => {
+        setRenamingFileId(null);
+        setRenameValue("");
+    };
+
+    const saveRename = async (fileId: number) => {
+        if (!renameValue.trim()) {
+            alert("Filename cannot be empty");
+            return;
+        }
+
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        try {
+            // Find the original file to get its extension
+            const originalFile = files.find(f => f.id === fileId);
+            if (!originalFile) return;
+
+            // Preserve the file extension
+            const lastDotIndex = originalFile.filename.lastIndexOf('.');
+            const extension = lastDotIndex > 0 ? originalFile.filename.substring(lastDotIndex) : '';
+            const newFullFilename = renameValue.trim() + extension;
+
+            const res = await fetch(`http://127.0.0.1:8000/files/${fileId}/rename?new_filename=${encodeURIComponent(newFullFilename)}`, {
+                method: "PATCH",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (!res.ok) {
+                const error = await res.text();
+                throw new Error(error);
+            }
+
+            // Update the file in the local state
+            setFiles(prev => prev.map(f => 
+                f.id === fileId ? { ...f, filename: newFullFilename } : f
+            ));
+
+            setRenamingFileId(null);
+            setRenameValue("");
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to rename file: " + err.message);
+        }
     };
 
     async function deleteSelectedFiles() {
@@ -539,7 +599,7 @@ export default function FilesPage() {
                         {sortedAndFilteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
-                                draggable
+                                draggable={renamingFileId !== file.id}
                                 onDragStart={(e) => onDragStart(e, file.id)}
                                 className={`border rounded-lg p-2 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab relative ${
                                     selectedFiles.has(file.id) ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-gray-200 dark:border-gray-700'
@@ -582,7 +642,7 @@ export default function FilesPage() {
                         {sortedAndFilteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
-                                draggable
+                                draggable={renamingFileId !== file.id}
                                 onDragStart={(e) => onDragStart(e, file.id)}
                                 className={`border rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab relative ${
                                     selectedFiles.has(file.id) ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-gray-200 dark:border-gray-700'
@@ -604,12 +664,39 @@ export default function FilesPage() {
                                 </Link>
                                 <div className="flex justify-between">
                                     <div className="flex flex-col flex-1 min-w-0 mr-2">
-                                        <div className="font-medium truncate text-gray-900 dark:text-gray-100" title={file.filename}>{file.filename}</div>
+                                        {renamingFileId === file.id ? (
+                                            <div className="flex items-center gap-1 mb-1">
+                                                <input
+                                                    type="text"
+                                                    value={renameValue}
+                                                    onChange={(e) => setRenameValue(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') saveRename(file.id);
+                                                        if (e.key === 'Escape') cancelRename();
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-white dark:bg-gray-900 w-full"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="font-medium truncate text-gray-900 dark:text-gray-100" title={file.filename}>{file.filename}</div>
+                                        )}
                                         <div className="text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition">Download</button>
-                                        <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
+                                        {renamingFileId === file.id ? (
+                                            <>
+                                                <button onClick={() => saveRename(file.id)} className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs">✓</button>
+                                                <button onClick={cancelRename} className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs">✕</button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => startRename(file)} className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-xs" title="Rename">✏️</button>
+                                                <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition">Download</button>
+                                                <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -634,7 +721,7 @@ export default function FilesPage() {
                         {sortedAndFilteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
-                                draggable
+                                draggable={renamingFileId !== file.id}
                                 onDragStart={(e) => onDragStart(e, file.id)}
                                 className={`border rounded-lg p-6 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-grab relative ${
                                     selectedFiles.has(file.id) ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-gray-200 dark:border-gray-700'
@@ -656,12 +743,39 @@ export default function FilesPage() {
                                 </Link>
                                 <div className="flex justify-between items-start">
                                     <div className="flex flex-col flex-1 min-w-0 mr-3">
-                                        <div className="font-medium text-lg truncate text-gray-900 dark:text-gray-100" title={file.filename}>{file.filename}</div>
+                                        {renamingFileId === file.id ? (
+                                            <div className="flex items-center gap-1 mb-1">
+                                                <input
+                                                    type="text"
+                                                    value={renameValue}
+                                                    onChange={(e) => setRenameValue(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') saveRename(file.id);
+                                                        if (e.key === 'Escape') cancelRename();
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-white dark:bg-gray-900 w-full"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="font-medium text-lg truncate text-gray-900 dark:text-gray-100" title={file.filename}>{file.filename}</div>
+                                        )}
                                         <div className="text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition">Download</button>
-                                        <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
+                                        {renamingFileId === file.id ? (
+                                            <>
+                                                <button onClick={() => saveRename(file.id)} className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs">✓</button>
+                                                <button onClick={cancelRename} className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs">✕</button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => startRename(file)} className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-xs" title="Rename">✏️</button>
+                                                <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition">Download</button>
+                                                <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -713,7 +827,7 @@ export default function FilesPage() {
                                 {sortedAndFilteredFiles.map((file) => (
                                     <tr 
                                         key={file.id} 
-                                        draggable
+                                        draggable={renamingFileId !== file.id}
                                         onDragStart={(e) => onDragStart(e, file.id)}
                                         className={`border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-grab ${
                                             selectedFiles.has(file.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
@@ -738,14 +852,44 @@ export default function FilesPage() {
                                             </Link>
                                         </td>
                                         <td className="p-3">
-                                            <Link href={`/files/${file.id}`} className="hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block max-w-xs" title={file.filename}>
-                                                {file.filename}
-                                            </Link>
+                                            {renamingFileId === file.id ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={renameValue}
+                                                        onChange={(e) => setRenameValue(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') saveRename(file.id);
+                                                            if (e.key === 'Escape') cancelRename();
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-white dark:bg-gray-900"
+                                                        autoFocus
+                                                    />
+                                                    <button
+                                                        onClick={() => saveRename(file.id)}
+                                                        className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs"
+                                                    >
+                                                        ✓
+                                                    </button>
+                                                    <button
+                                                        onClick={cancelRename}
+                                                        className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <Link href={`/files/${file.id}`} className="hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block max-w-xs" title={file.filename}>
+                                                    {file.filename}
+                                                </Link>
+                                            )}
                                         </td>
                                         <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</td>
                                         <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{file.uploaded_at ? new Date(file.uploaded_at).toLocaleDateString() : 'N/A'}</td>
                                         <td className="p-3 text-right">
                                             <div className="flex gap-2 justify-end">
+                                                <button onClick={() => startRename(file)} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-sm" title="Rename">✏️</button>
                                                 <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm">Download</button>
                                                 <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm">Delete</button>
                                             </div>
@@ -776,7 +920,7 @@ export default function FilesPage() {
                         {sortedAndFilteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
-                                draggable
+                                draggable={renamingFileId !== file.id}
                                 onDragStart={(e) => onDragStart(e, file.id)}
                                 className={`border rounded-lg p-4 shadow-sm hover:shadow-md transition flex items-center justify-between bg-white dark:bg-gray-800 cursor-grab ${
                                     selectedFiles.has(file.id) ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-gray-200 dark:border-gray-700'
@@ -798,13 +942,45 @@ export default function FilesPage() {
                                         )}
                                     </Link>
                                     <div className="flex-1 min-w-0">
-                                        <Link href={`/files/${file.id}`} className="font-medium hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block" title={file.filename}>
-                                            {file.filename}
-                                        </Link>
-                                        <div className="text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</div>
+                                        {renamingFileId === file.id ? (
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={renameValue}
+                                                    onChange={(e) => setRenameValue(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') saveRename(file.id);
+                                                        if (e.key === 'Escape') cancelRename();
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-white dark:bg-gray-900 flex-1"
+                                                    autoFocus
+                                                />
+                                                <button
+                                                    onClick={() => saveRename(file.id)}
+                                                    className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs"
+                                                >
+                                                    ✓
+                                                </button>
+                                                <button
+                                                    onClick={cancelRename}
+                                                    className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <Link href={`/files/${file.id}`} className="font-medium hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block" title={file.filename}>
+                                                    {file.filename}
+                                                </Link>
+                                                <div className="text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
+                                    <button onClick={() => startRename(file)} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition" title="Rename">✏️</button>
                                     <button onClick={() => downloadFile(file.id, file.filename)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition">Download</button>
                                     <button onClick={() => deleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
                                 </div>
