@@ -7,7 +7,7 @@ from core.security import get_current_user
 from core.database import get_db
 from models import User, UserFile, FileStorageHistory
 from schemas.file_schemas import FileDetailResponse, FileListItem
-from services.s3_client import upload_file_to_s3, delete_file_from_s3, generate_presigned_url, generate_download_url
+from services.s3_client import upload_file_to_s3, delete_file_from_s3, generate_presigned_url, generate_download_url, copy_file_in_s3, copy_file_in_s3
 from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/files", tags=["Files"])
@@ -228,6 +228,61 @@ async def list_files(
     )
 
     return files
+
+@router.patch("/{file_id}/rename")
+async def rename_file(
+    file_id: int,
+    new_filename: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Rename a file without re-uploading.
+    Updates the filename in the database and the S3 key.
+    """
+    if not new_filename or not new_filename.strip():
+        raise HTTPException(status_code=400, detail="Filename cannot be empty")
+    
+    new_filename = new_filename.strip()
+    
+    # Get the file record
+    file_record = (
+        db.query(UserFile)
+        .filter(UserFile.user_id == current_user.id, UserFile.id == file_id)
+        .first()
+    )
+    
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    old_key = file_record.file_key
+    
+    # Generate new S3 key with the new filename
+    if file_record.folder_id:
+        new_key = f"users/{current_user.id}/folders/{file_record.folder_id}/{new_filename}"
+    else:
+        new_key = f"users/{current_user.id}/{new_filename}"
+    
+    try:
+        # Copy object to new key and delete old one
+        copy_file_in_s3(old_key, new_key)
+        delete_file_from_s3(old_key)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to rename file in S3: {str(e)}")
+    
+    # Update database record
+    file_record.filename = new_filename
+    file_record.file_key = new_key
+    
+    db.commit()
+    db.refresh(file_record)
+    
+    return {
+        "id": file_record.id,
+        "filename": file_record.filename,
+        "file_key": file_record.file_key,
+        "message": "File renamed successfully"
+    }
 
 @router.get("/favicon.ico")
 async def favicon():

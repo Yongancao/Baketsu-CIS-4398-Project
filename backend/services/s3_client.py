@@ -50,3 +50,15 @@ def generate_download_url(key: str, filename: str, expires_in: int = 300):
         },
         ExpiresIn=expires_in
     )
+
+BUCKET_NAME = AWS_BUCKET_NAME
+
+def copy_file_in_s3(source_key: str, destination_key: str):
+    """
+    Copy a file from one S3 key to another within the same bucket.
+    """
+    s3.copy_object(
+        Bucket=AWS_BUCKET_NAME,
+        CopySource={'Bucket': AWS_BUCKET_NAME, 'Key': source_key},
+        Key=destination_key
+    )
