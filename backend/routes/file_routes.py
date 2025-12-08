@@ -260,7 +260,10 @@ async def list_files(
             "id": file.id,
             "filename": file.filename,
             "file_size": file.file_size,
-            "uploaded_at": uploaded_at
+            "uploaded_at": uploaded_at,
+            "preview_url": generate_presigned_url(file.file_key),
+            "download_url": generate_download_url(file.file_key, file.filename),
+            "folder_id": file.folder_id
         })
     
     return result
@@ -368,9 +371,54 @@ async def get_file_details(
         uploaded_at = None
 
     return {
+        "folder_id": file_record.folder_id,
         "id": file_record.id,
         "filename": file_record.filename,
         "file_size": file_record.file_size,
         "preview_url": preview_url,
         "uploaded_at": uploaded_at,
     }
+
+@router.get("/in-folder/{folder_id}")
+def get_files_in_folder(
+    folder_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    from datetime import datetime, timezone
+
+    files = db.query(UserFile).filter(
+        UserFile.user_id == current_user.id,
+        UserFile.folder_id == folder_id
+    ).all()
+
+    result = []
+    for f in files:
+
+        print("DEBUG FILE KEY:", f.file_key)
+
+        # --- Ensure uploaded_at is ISO formatted like /files/list ---
+        uploaded_at = f.uploaded_at
+        if isinstance(uploaded_at, str):
+            try:
+                dt = datetime.strptime(uploaded_at, "%Y-%m-%d %H:%M:%S")
+                uploaded_at = dt.replace(tzinfo=timezone.utc).isoformat()
+            except:
+                pass
+        elif isinstance(uploaded_at, datetime):
+            if uploaded_at.tzinfo is None:
+                uploaded_at = uploaded_at.replace(tzinfo=timezone.utc)
+            uploaded_at = uploaded_at.isoformat()
+        # ----------------------------------------------------------------
+
+        result.append({
+            "id": f.id,
+            "filename": f.filename,
+            "file_size": f.file_size,
+            "uploaded_at": uploaded_at,
+            "preview_url": generate_presigned_url(f.file_key),
+            "download_url": generate_download_url(f.file_key, f.filename),
+            "folder_id": f.folder_id
+        })
+
+    return result

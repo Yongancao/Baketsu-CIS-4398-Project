@@ -33,6 +33,7 @@ export default function FilesPage() {
         }
         return "medium";
     });
+    const [currentFolder, setCurrentFolder] = useState<number | null>(null);
 
     const handleViewModeChange = (mode: "small" | "medium" | "large" | "details" | "list") => {
         setViewMode(mode);
@@ -112,7 +113,14 @@ export default function FilesPage() {
     // ----------------------
     // SORT FUNCTIONS
     // ----------------------
-    const sortedAndFilteredFiles = [...filteredFiles].sort((a, b) => {
+    const sortedAndFilteredFiles = [...filteredFiles]
+    //     .filter(f => {
+    //     if (currentFolder === null) {
+    //         return f.folder_id === null; // root folder
+    //     }
+    //     return f.folder_id === currentFolder;
+    // })
+        .sort((a, b) => {
         let comparison = 0;
 
         switch (sortBy) {
@@ -378,6 +386,7 @@ export default function FilesPage() {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 const fileList = await filesRes.json();
+                console.log("🔍 fileList =", fileList);
 
                 const enhancedFiles = await Promise.all(
                     fileList.map(async (file: any) => {
@@ -442,7 +451,7 @@ export default function FilesPage() {
         if (!token) return;
 
         try {
-            const res = await fetch(`http://127.0.0.1:8000/files/move`, {
+            const res = await fetch("http://127.0.0.1:8000/folders/move", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`,
@@ -450,17 +459,61 @@ export default function FilesPage() {
                 },
                 body: JSON.stringify({
                     file_id: Number(fileId),
-                    folder_id: folderId
+                    folder_id: folderId,
                 }),
             });
 
             if (!res.ok) throw new Error("Failed to move file");
 
-            // Remove moved file from list so it visually disappears
-            setFiles(prev => prev.filter(f => f.id !== Number(fileId)));
+            setFiles(prev =>
+                prev.map(f => 
+                    f.id === Number(fileId) ? { ...f, folder_id: folderId } : f
+                )
+            );
+
         } catch (err) {
             console.error(err);
             alert("Failed to move file.");
+        }
+    }
+
+    async function openFolder(folderId: number) {
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/files/in-folder/${folderId}`, {
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                },
+            });
+
+            if (!res.ok) throw new Error("Failed to load folder");
+            const data = await res.json();
+            
+            const enhancedFiles = await Promise.all(
+            data.map(async (file: any) => {
+                if (!isImageFile(file.filename)) return file;
+
+                try {
+                    const res = await fetch(`http://127.0.0.1:8000/files/${file.id}`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    if (!res.ok) return file;
+                    const json = await res.json();
+                    return { ...file, thumbnailUrl: json.preview_url };
+                } catch {
+                    return file;
+                }
+            })
+        );
+            console.log("Opened folder ID:", folderId);
+            console.log("Files inside folder:", data);
+            setFiles(enhancedFiles);     // show only files inside the folder
+            setCurrentFolder(folderId); // optional
+        } catch (err) {
+            console.error(err);
+            alert("Failed to load folder contents.");
         }
     }
 
@@ -624,10 +677,11 @@ export default function FilesPage() {
                 {/* Small Icons View */}
                 {viewMode === "small" && (
                     <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                        {folders.map(folder => (
+                        {currentFolder === null && folders.map(folder => (
                             <div
                                 key={`folder-${folder.id}`}
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-pointer"
+                                onClick={() => openFolder(folder.id)}
                                 onDrop={(e) => onDrop(e, folder.id)}
                                 onDragOver={onDragOver}
                             >
@@ -667,10 +721,11 @@ export default function FilesPage() {
                 {/* Medium Icons View */}
                 {viewMode === "medium" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {folders.map(folder => (
+                        {currentFolder === null && folders.map(folder => (
                             <div
                                 key={`folder-${folder.id}`}
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 flex flex-col items-center justify-center cursor-pointer"
+                                onClick={() => openFolder(folder.id)}
                                 onDrop={(e) => onDrop(e, folder.id)}
                                 onDragOver={onDragOver}
                             >
@@ -746,10 +801,11 @@ export default function FilesPage() {
                 {/* Large Icons View */}
                 {viewMode === "large" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {folders.map(folder => (
+                        {currentFolder === null && folders.map(folder => (
                             <div
                                 key={`folder-${folder.id}`}
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 flex flex-col items-center justify-center cursor-pointer"
+                                onClick={() => openFolder(folder.id)}
                                 onDrop={(e) => onDrop(e, folder.id)}
                                 onDragOver={onDragOver}
                             >
@@ -844,10 +900,11 @@ export default function FilesPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {folders.map(folder => (
+                               {currentFolder === null && folders.map(folder => (
                                     <tr 
                                         key={`folder-${folder.id}`} 
                                         className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer"
+                                        onClick={() => openFolder(folder.id)}
                                         onDrop={(e) => onDrop(e, folder.id)}
                                         onDragOver={onDragOver}
                                     >
@@ -943,10 +1000,11 @@ export default function FilesPage() {
                 {/* List View */}
                 {viewMode === "list" && (
                     <div className="space-y-2">
-                        {folders.map(folder => (
+                        {currentFolder === null && folders.map(folder => (
                             <div 
                                 key={`folder-${folder.id}`} 
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition flex items-center justify-between bg-white dark:bg-gray-800 cursor-pointer"
+                                onClick={() => openFolder(folder.id)}
                                 onDrop={(e) => onDrop(e, folder.id)}
                                 onDragOver={onDragOver}
                             >

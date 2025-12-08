@@ -162,6 +162,8 @@ export default function FilePreviewPage() {
                 // If it's text, fetch raw content from presigned URL
                 if (isText(data.filename)) {
                     try {
+                        console.log("DEBUG PREVIEW URL:", data.preview_url);
+                        console.log("DEBUG FILENAME:", data.filename);  
                         const textRes = await fetch(data.preview_url);
                         if (textRes.ok) {
                             const text = await textRes.text();

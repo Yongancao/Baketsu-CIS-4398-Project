@@ -4,6 +4,8 @@ from core.database import get_db
 from core.security import get_current_user
 from models.folder import Folder
 from models.file import UserFile
+from pydantic import BaseModel
+
 
 router = APIRouter(prefix="/folders", tags=["Folders"])
 
@@ -54,14 +56,42 @@ def list_folders(
     folders = db.query(Folder).filter(Folder.user_id == current_user.id).all()
     return folders
 
+
+class MoveRequest(BaseModel):
+    file_id: int
+    folder_id: int | None = None
+
+# @router.post("/move")
+# def move_file(
+#     file_id: int,
+#     folder_id: int | None = None,
+#     db: Session = Depends(get_db),
+#     current_user = Depends(get_current_user)
+# ):
+#     file_record = db.query(UserFile).filter(UserFile.id == file_id, UserFile.user_id == current_user.id).first()
+#     if not file_record:
+#         raise HTTPException(404, "File not found")
+
+#     file_record.folder_id = folder_id
+#     db.commit()
+#     db.refresh(file_record)
+
+#     return {"message": "File moved successfully", "file_id": file_id, "folder_id": folder_id}
+
 @router.post("/move")
 def move_file(
-    file_id: int,
-    folder_id: int | None = None,
+    data: MoveRequest,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    file_record = db.query(UserFile).filter(UserFile.id == file_id, UserFile.user_id == current_user.id).first()
+    file_id = data.file_id
+    folder_id = data.folder_id
+
+    file_record = db.query(UserFile).filter(
+        UserFile.id == file_id,
+        UserFile.user_id == current_user.id
+    ).first()
+
     if not file_record:
         raise HTTPException(404, "File not found")
 
@@ -69,4 +99,4 @@ def move_file(
     db.commit()
     db.refresh(file_record)
 
-    return {"message": "File moved successfully", "file_id": file_id, "folder_id": folder_id}
+    return {"message": "File moved successfully"}
