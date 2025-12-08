@@ -1138,78 +1138,82 @@ export default function FilesPage() {
                 )}
 
                 {/* Details View */}
-                {viewMode === "details" && (
+                    {viewMode === "details" && (
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                         <table className="w-full">
-                            <thead className="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                                <tr>
-                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100 w-12">
+                        <thead className="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                            <tr>
+                            <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100 w-12">
+                                <input
+                                type="checkbox"
+                                checked={sortedAndFilteredFiles.length > 0 && selectedFiles.size === sortedAndFilteredFiles.length}
+                                onChange={selectAllFiles}
+                                className="w-4 h-4 cursor-pointer"
+                                />
+                            </th>
+                            <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Preview</th>
+                            <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Name</th>
+                            <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Size</th>
+                            <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Uploaded</th>
+                            <th className="text-right p-3 font-medium text-gray-900 dark:text-gray-100">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {currentFolder === null && filteredFolders.map(folder => (
+                            <tr
+                                key={`folder-${folder.id}`}
+                                className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer"
+                                onClick={() => router.push(`/files/folder/${folder.id}`)}
+                                onDrop={(e) => onDrop(e, folder.id)}
+                                onDragOver={onDragOver}
+                            >
+                                <td className="p-3"></td>
+                                <td className="p-3">
+                                <div className="w-12 h-12 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-md flex items-center justify-center">
+                                    <FolderIcon color={folder.color || '#FBBF24'} size={40} />
+                                    </div>
+                                </div>
+                                </td>
+                                <td className="p-3">
+                                <span className="text-gray-900 dark:text-gray-100 font-medium">{folder.name}</span>
+                                </td>
+                                <td className="p-3 text-sm text-gray-600 dark:text-gray-400">
+                                {formatFileSize(getFolderSize(folder.id))}
+                                </td>
+                                <td className="p-3 text-sm text-gray-600 dark:text-gray-400">
+                                {folder.created_at ? formatDateTime(folder.created_at) : '—'}
+                                </td>
+                                <td className="p-3 text-right">
+                                <div className="flex gap-2 justify-end">
+                                    {renamingFolderId === folder.id ? (
+                                    <>
                                         <input
-                                            type="checkbox"
-                                            checked={sortedAndFilteredFiles.length > 0 && selectedFiles.size === sortedAndFilteredFiles.length}
-                                            onChange={selectAllFiles}
-                                            className="w-4 h-4 cursor-pointer"
+                                        type="text"
+                                        value={renameFolderValue}
+                                        onChange={(e) => setRenameFolderValue(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') saveFolderRename(folder.id);
+                                            if (e.key === 'Escape') cancelFolderRename();
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="px-2 py-1 border border-blue-500 rounded text-sm w-40"
+                                        autoFocus
                                         />
-                                    </th>
-                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Preview</th>
-                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Name</th>
-                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Size</th>
-                                    <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100">Uploaded</th>
-                                    <th className="text-right p-3 font-medium text-gray-900 dark:text-gray-100">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                               {currentFolder === null && filteredFolders.map(folder => (
-                                    <tr 
-                                        key={`folder-${folder.id}`} 
-                                        className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer"
-                                        onClick={() => router.push(`/files/folder/${folder.id}`)}
-                                        onDrop={(e) => onDrop(e, folder.id)}
-                                        onDragOver={onDragOver}
-                                    >
-                                        <td className="p-3">
-                                            <div className="flex gap-2 justify-end">
-                                                {renamingFolderId === folder.id ? (
-                                                    <>
-                                                        <input
-                                                            type="text"
-                                                            value={renameFolderValue}
-                                                            onChange={(e) => setRenameFolderValue(e.target.value)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') saveFolderRename(folder.id);
-                                                                if (e.key === 'Escape') cancelFolderRename();
-                                                            }}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className="px-2 py-1 border border-blue-500 rounded text-sm w-40"
-                                                            autoFocus
-                                                        />
-                                                        <button onClick={(e) => { e.stopPropagation(); saveFolderRename(folder.id); }} className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs">✓</button>
-                                                        <button onClick={(e) => { e.stopPropagation(); cancelFolderRename(); }} className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs">✕</button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <button onClick={(e) => { e.stopPropagation(); startFolderRename(folder); }} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-sm cursor-pointer" title="Rename">✏️</button>
-                                                        <button onClick={(e) => { e.stopPropagation(); downloadFolder(folder.id, folder.name); }} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm cursor-pointer">Download</button>
-                                                        <button onClick={(e) => { e.stopPropagation(); deleteFolderById(folder.id); }} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm cursor-pointer">Delete</button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-3">
-                                                <div className="w-12 h-12 flex items-center justify-center">
-                                                    <div className="w-10 h-10 rounded-md flex items-center justify-center">
-                                                        <FolderIcon color={folder.color || '#FBBF24'} size={40} />
-                                                    </div>
-                                                </div>
-                                        </td>
-                                        <td className="p-3">
-                                            <span className="text-gray-900 dark:text-gray-100 font-medium">{folder.name}</span>
-                                        </td>
-                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{formatFileSize(getFolderSize(folder.id))}</td>
-                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{folder.created_at ? formatDateTime(folder.created_at) : '—'}</td>
-                                        <td className="p-3"></td>
-                                    </tr>
-                                ))}
+                                        <button onClick={(e) => { e.stopPropagation(); saveFolderRename(folder.id); }} className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs">✓</button>
+                                        <button onClick={(e) => { e.stopPropagation(); cancelFolderRename(); }} className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs">✕</button>
+                                    </>
+                                    ) : (
+                                    <>
+                                        <button onClick={(e) => { e.stopPropagation(); startFolderRename(folder); }} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-sm cursor-pointer" title="Rename">✏️</button>
+                                        <button onClick={(e) => { e.stopPropagation(); downloadFolder(folder.id, folder.name); }} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm cursor-pointer">Download</button>
+                                        <button onClick={(e) => { e.stopPropagation(); deleteFolderById(folder.id); }} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm cursor-pointer">Delete</button>
+                                    </>
+                                    )}
+                                </div>
+                                </td>
+                            </tr>
+                            ))}
                                 {sortedAndFilteredFiles.map((file) => (
                                     <tr 
                                         key={file.id} 
@@ -1237,7 +1241,7 @@ export default function FilesPage() {
                                                 )}
                                             </Link>
                                         </td>
-                                        <td className="p-3">
+                                        <td className="p-3 ">
                                             {renamingFileId === file.id ? (
                                                 <div className="flex items-center gap-2">
                                                     <input
