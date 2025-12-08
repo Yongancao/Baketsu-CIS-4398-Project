@@ -16,6 +16,7 @@ router = APIRouter(prefix="/folders", tags=["Folders"])
 def create_folder(
     name: str,
     parent_id: int | None = None,
+    color: str | None = None,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -42,7 +43,8 @@ def create_folder(
     folder = Folder(
         name=name,
         user_id=current_user.id,
-        parent_id=parent_id  # None for root folders
+        parent_id=parent_id,  # None for root folders
+        color=color or None
     )
 
     db.add(folder)
