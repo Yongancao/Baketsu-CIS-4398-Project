@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ProtectedPage from "@/components/ProtectedPage";
+import { useRouter } from "next/navigation";
+import { getJsonWithAuth } from "@/lib/api";
 
 export default function FilesPage() {
     const [files, setFiles] = useState<any[]>([]);
@@ -27,6 +29,8 @@ export default function FilesPage() {
     });
     const [renamingFileId, setRenamingFileId] = useState<number | null>(null);
     const [renameValue, setRenameValue] = useState("");
+    const [renamingFolderId, setRenamingFolderId] = useState<number | null>(null);
+    const [renameFolderValue, setRenameFolderValue] = useState("");
     const [viewMode, setViewMode] = useState<"small" | "medium" | "large" | "details" | "list">(() => {
         if (typeof window !== "undefined") {
             return (localStorage.getItem("filesViewMode") as any) || "medium";
@@ -39,7 +43,7 @@ export default function FilesPage() {
         setViewMode(mode);
         localStorage.setItem("filesViewMode", mode);
     };
-
+    const router = useRouter();
     // ----------------------
     // DATE FORMATTING
     // ----------------------
@@ -104,6 +108,32 @@ export default function FilesPage() {
         return true;
     });
 
+    const filteredFolders = folders.filter(folder => {
+        // Name (search) filter for folders
+        if (searchQuery && !folder.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+            return false;
+        }
+
+        // Date range filter for folders
+        if (dateRange.start || dateRange.end) {
+            const folderDate = folder.created_at ? new Date(folder.created_at) : null;
+            if (!folderDate) return false;
+
+            if (dateRange.start) {
+                const startDate = new Date(dateRange.start);
+                if (folderDate < startDate) return false;
+            }
+
+            if (dateRange.end) {
+                const endDate = new Date(dateRange.end);
+                endDate.setHours(23, 59, 59, 999); // Include the entire end day
+                if (folderDate > endDate) return false;
+            }
+        }
+
+        return true;
+    });
+
     const clearFilters = () => {
         setSearchQuery("");
         setFileTypeFilter("all");
@@ -114,12 +144,12 @@ export default function FilesPage() {
     // SORT FUNCTIONS
     // ----------------------
     const sortedAndFilteredFiles = [...filteredFiles]
-    //     .filter(f => {
-    //     if (currentFolder === null) {
-    //         return f.folder_id === null; // root folder
-    //     }
-    //     return f.folder_id === currentFolder;
-    // })
+        .filter(f => {
+        if (currentFolder === null) {
+            return f.folder_id === null; // root folder
+        }
+        return f.folder_id === currentFolder;
+    })
         .sort((a, b) => {
         let comparison = 0;
 
@@ -190,6 +220,102 @@ export default function FilesPage() {
         setRenamingFileId(null);
         setRenameValue("");
     };
+
+    // ----------------------
+    // FOLDER RENAME / DELETE / DOWNLOAD
+    // ----------------------
+    const startFolderRename = (folder: any) => {
+        setRenamingFolderId(folder.id);
+        setRenameFolderValue(folder.name);
+    };
+
+    const cancelFolderRename = () => {
+        setRenamingFolderId(null);
+        setRenameFolderValue("");
+    };
+
+    const saveFolderRename = async (folderId: number) => {
+        if (!renameFolderValue.trim()) {
+            alert("Folder name cannot be empty");
+            return;
+        }
+
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/folders/${folderId}/rename?new_name=${encodeURIComponent(renameFolderValue.trim())}`, {
+                method: "PATCH",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "Failed to rename folder");
+            }
+
+            const updated = await res.json();
+            setFolders(prev => prev.map(f => f.id === folderId ? updated : f));
+            setRenamingFolderId(null);
+            setRenameFolderValue("");
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to rename folder: " + err.message);
+        }
+    };
+
+    async function deleteFolderById(folderId: number) {
+        if (!confirm("Delete this folder and all files inside?")) return;
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/folders/${folderId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "Failed to delete folder");
+            }
+
+            setFolders(prev => prev.filter(f => f.id !== folderId));
+            setFiles(prev => prev.filter(fl => fl.folder_id !== folderId));
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to delete folder: " + err.message);
+        }
+    }
+
+    async function downloadFolder(folderId: number, folderName: string) {
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/folders/${folderId}/download`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "Failed to download folder");
+            }
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${folderName || 'folder'}_${folderId}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to download folder: " + err.message);
+        }
+    }
 
     const saveRename = async (fileId: number) => {
         if (!renameValue.trim()) {
@@ -335,6 +461,23 @@ export default function FilesPage() {
     }
 
     // ----------------------
+    // CALCULATE FOLDER SIZE
+    // ----------------------
+    function getFolderSize(folderId: number | null): number {
+        return files
+            .filter(f => f.folder_id === folderId)
+            .reduce((total, f) => total + (f.file_size || 0), 0);
+    }
+
+    function formatFileSize(bytes: number): string {
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return (bytes / Math.pow(k, i)).toFixed(1) + " " + sizes[i];
+    }
+
+    // ----------------------
     // CREATE FOLDER
     // ----------------------
     async function createFolder() {
@@ -382,10 +525,7 @@ export default function FilesPage() {
 
         async function fetchData() {
             try {
-                const filesRes = await fetch("http://127.0.0.1:8000/files/list", {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                const fileList = await filesRes.json();
+                const fileList = await getJsonWithAuth("/files/list");
                 console.log("🔍 fileList =", fileList);
 
                 const enhancedFiles = await Promise.all(
@@ -393,14 +533,7 @@ export default function FilesPage() {
                         if (!isImageFile(file.filename)) return file;
 
                         try {
-                            const res = await fetch(
-                                `http://127.0.0.1:8000/files/${file.id}`,
-                                { headers: { Authorization: `Bearer ${token}` } }
-                            );
-
-                            if (!res.ok) return file;
-
-                            const json = await res.json();
+                            const json = await getJsonWithAuth(`/files/${file.id}`);
 
                             return {
                                 ...file,
@@ -414,10 +547,7 @@ export default function FilesPage() {
 
                 setFiles(enhancedFiles);
 
-                const foldersRes = await fetch("http://127.0.0.1:8000/folders/list", {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                const folderList = await foldersRes.json();
+                const folderList = await getJsonWithAuth("/folders/list");
                 setFolders(Array.isArray(folderList) ? folderList : []);
             } catch (err) {
                 console.error(err);
@@ -434,7 +564,13 @@ export default function FilesPage() {
     // DRAG & DROP HANDLERS
     // ----------------------
     function onDragStart(e: React.DragEvent<HTMLDivElement>, fileId: number) {
-        e.dataTransfer.setData("fileId", String(fileId));
+        // If dragging a selected file and multiple are selected, drag all selected
+        if (selectedFiles.has(fileId) && selectedFiles.size > 1) {
+            e.dataTransfer.setData("fileIds", JSON.stringify(Array.from(selectedFiles)));
+        } else {
+            // Otherwise drag just this one file
+            e.dataTransfer.setData("fileIds", JSON.stringify([fileId]));
+        }
     }
 
     function onDragOver(e: React.DragEvent<HTMLDivElement>) {
@@ -444,76 +580,50 @@ export default function FilesPage() {
     async function onDrop(e: React.DragEvent<HTMLDivElement>, folderId: number) {
         e.preventDefault();
 
-        const fileId = e.dataTransfer.getData("fileId");
-        if (!fileId) return;
+        const fileIdsStr = e.dataTransfer.getData("fileIds");
+        if (!fileIdsStr) return;
+
+        let fileIds: number[] = [];
+        try {
+            fileIds = JSON.parse(fileIdsStr);
+        } catch {
+            return;
+        }
 
         const token = localStorage.getItem("access_token");
         if (!token) return;
 
         try {
-            const res = await fetch("http://127.0.0.1:8000/folders/move", {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    file_id: Number(fileId),
-                    folder_id: folderId,
-                }),
-            });
-
-            if (!res.ok) throw new Error("Failed to move file");
-
-            setFiles(prev =>
-                prev.map(f => 
-                    f.id === Number(fileId) ? { ...f, folder_id: folderId } : f
+            // Move all selected files to the folder
+            await Promise.all(
+                fileIds.map(fileId =>
+                    fetch("http://127.0.0.1:8000/folders/move", {
+                        method: "POST",
+                        headers: {
+                            "Authorization": `Bearer ${token}`,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            file_id: fileId,
+                            folder_id: folderId,
+                        }),
+                    })
                 )
             );
 
-        } catch (err) {
-            console.error(err);
-            alert("Failed to move file.");
-        }
-    }
-
-    async function openFolder(folderId: number) {
-        const token = localStorage.getItem("access_token");
-        if (!token) return;
-
-        try {
-            const res = await fetch(`http://127.0.0.1:8000/files/in-folder/${folderId}`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
-            });
-
-            if (!res.ok) throw new Error("Failed to load folder");
-            const data = await res.json();
+            // Update UI: move files to folder
+            setFiles(prev =>
+                prev.map(f => 
+                    fileIds.includes(f.id) ? { ...f, folder_id: folderId } : f
+                )
+            );
             
-            const enhancedFiles = await Promise.all(
-            data.map(async (file: any) => {
-                if (!isImageFile(file.filename)) return file;
+            // Clear selection
+            setSelectedFiles(new Set());
 
-                try {
-                    const res = await fetch(`http://127.0.0.1:8000/files/${file.id}`, {
-                        headers: { Authorization: `Bearer ${token}` },
-                    });
-                    if (!res.ok) return file;
-                    const json = await res.json();
-                    return { ...file, thumbnailUrl: json.preview_url };
-                } catch {
-                    return file;
-                }
-            })
-        );
-            console.log("Opened folder ID:", folderId);
-            console.log("Files inside folder:", data);
-            setFiles(enhancedFiles);     // show only files inside the folder
-            setCurrentFolder(folderId); // optional
         } catch (err) {
             console.error(err);
-            alert("Failed to load folder contents.");
+            alert("Failed to move files.");
         }
     }
 
@@ -677,16 +787,43 @@ export default function FilesPage() {
                 {/* Small Icons View */}
                 {viewMode === "small" && (
                     <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                        {currentFolder === null && folders.map(folder => (
+                        {currentFolder === null && filteredFolders.map(folder => (
                             <div
                                 key={`folder-${folder.id}`}
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-pointer"
-                                onClick={() => openFolder(folder.id)}
+                                onClick={() => router.push(`/files/folder/${folder.id}`)}
                                 onDrop={(e) => onDrop(e, folder.id)}
                                 onDragOver={onDragOver}
                             >
                                 <div className="w-full h-16 flex items-center justify-center text-4xl">📁</div>
                                 <div className="text-xs truncate text-gray-900 dark:text-gray-100 text-center" title={folder.name}>{folder.name}</div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400 text-center">{formatFileSize(getFolderSize(folder.id))}</div>
+                                <div className="mt-2 flex items-center justify-center gap-2">
+                                    {renamingFolderId === folder.id ? (
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={renameFolderValue}
+                                                onChange={(e) => setRenameFolderValue(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') saveFolderRename(folder.id);
+                                                    if (e.key === 'Escape') cancelFolderRename();
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="px-2 py-1 border border-blue-500 rounded text-sm w-28"
+                                                autoFocus
+                                            />
+                                            <button onClick={(e) => { e.stopPropagation(); saveFolderRename(folder.id); }} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
+                                            <button onClick={(e) => { e.stopPropagation(); cancelFolderRename(); }} className="px-2 py-1 bg-gray-500 text-white rounded text-xs">✕</button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button onClick={(e) => { e.stopPropagation(); startFolderRename(folder); }} className="px-2 py-1 bg-yellow-500 text-white rounded text-xs cursor-pointer">✏️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); downloadFolder(folder.id, folder.name); }} className="px-2 py-1 bg-blue-500 text-white rounded text-xs cursor-pointer">⬇️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteFolderById(folder.id); }} className="px-2 py-1 bg-red-500 text-white rounded text-xs cursor-pointer">🗑️</button>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         ))}
                         {sortedAndFilteredFiles.map((file) => (
@@ -705,7 +842,7 @@ export default function FilesPage() {
                                     onClick={(e) => e.stopPropagation()}
                                     className="absolute top-1 left-1 w-4 h-4 cursor-pointer z-10"
                                 />
-                                <Link href={`/files/${file.id}`} className="block">
+                                <Link href={`/files/${file.id}${file.folder_id ? `?folderId=${file.folder_id}` : ''}`} className="block">
                                     {file.thumbnailUrl ? (
                                         <img src={file.thumbnailUrl} alt={file.filename} className="w-full h-16 object-cover rounded mb-1" />
                                     ) : (
@@ -721,16 +858,43 @@ export default function FilesPage() {
                 {/* Medium Icons View */}
                 {viewMode === "medium" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {currentFolder === null && folders.map(folder => (
+                        {currentFolder === null && filteredFolders.map(folder => (
                             <div
                                 key={`folder-${folder.id}`}
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 flex flex-col items-center justify-center cursor-pointer"
-                                onClick={() => openFolder(folder.id)}
+                                onClick={() => router.push(`/files/folder/${folder.id}`)}
                                 onDrop={(e) => onDrop(e, folder.id)}
                                 onDragOver={onDragOver}
                             >
                                 <span className="text-6xl">📁</span>
                                 <div className="mt-2 font-medium text-gray-900 dark:text-gray-100">{folder.name}</div>
+                                <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">{formatFileSize(getFolderSize(folder.id))}</div>
+                                <div className="mt-3 flex items-center gap-2">
+                                    {renamingFolderId === folder.id ? (
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={renameFolderValue}
+                                                onChange={(e) => setRenameFolderValue(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') saveFolderRename(folder.id);
+                                                    if (e.key === 'Escape') cancelFolderRename();
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="px-2 py-1 border border-blue-500 rounded text-sm w-32"
+                                                autoFocus
+                                            />
+                                            <button onClick={(e) => { e.stopPropagation(); saveFolderRename(folder.id); }} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
+                                            <button onClick={(e) => { e.stopPropagation(); cancelFolderRename(); }} className="px-2 py-1 bg-gray-500 text-white rounded text-xs">✕</button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button onClick={(e) => { e.stopPropagation(); startFolderRename(folder); }} className="px-2 py-1 bg-yellow-500 text-white rounded text-sm cursor-pointer">✏️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); downloadFolder(folder.id, folder.name); }} className="px-2 py-1 bg-blue-500 text-white rounded text-sm cursor-pointer">⬇️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteFolderById(folder.id); }} className="px-2 py-1 bg-red-500 text-white rounded text-sm cursor-pointer">🗑️</button>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         ))}
                         {sortedAndFilteredFiles.map((file) => (
@@ -749,7 +913,7 @@ export default function FilesPage() {
                                     onClick={(e) => e.stopPropagation()}
                                     className="absolute top-2 left-2 w-5 h-5 cursor-pointer z-10"
                                 />
-                                <Link href={`/files/${file.id}`} className="block mb-2">
+                                <Link href={`/files/${file.id}${file.folder_id ? `?folderId=${file.folder_id}` : ''}`} className="block mb-2">
                                     {file.thumbnailUrl ? (
                                         <img src={file.thumbnailUrl} alt={file.filename} className="w-full h-40 object-cover rounded mb-2" />
                                     ) : (
@@ -801,16 +965,43 @@ export default function FilesPage() {
                 {/* Large Icons View */}
                 {viewMode === "large" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {currentFolder === null && folders.map(folder => (
+                        {currentFolder === null && filteredFolders.map(folder => (
                             <div
                                 key={`folder-${folder.id}`}
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 flex flex-col items-center justify-center cursor-pointer"
-                                onClick={() => openFolder(folder.id)}
+                                onClick={() => router.push(`/files/folder/${folder.id}`)}
                                 onDrop={(e) => onDrop(e, folder.id)}
                                 onDragOver={onDragOver}
                             >
                                 <span className="text-8xl">📁</span>
                                 <div className="mt-3 font-medium text-lg text-gray-900 dark:text-gray-100">{folder.name}</div>
+                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">{formatFileSize(getFolderSize(folder.id))}</div>
+                                <div className="mt-3 flex items-center gap-2">
+                                    {renamingFolderId === folder.id ? (
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={renameFolderValue}
+                                                onChange={(e) => setRenameFolderValue(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') saveFolderRename(folder.id);
+                                                    if (e.key === 'Escape') cancelFolderRename();
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="px-2 py-1 border border-blue-500 rounded text-sm w-48"
+                                                autoFocus
+                                            />
+                                            <button onClick={(e) => { e.stopPropagation(); saveFolderRename(folder.id); }} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
+                                            <button onClick={(e) => { e.stopPropagation(); cancelFolderRename(); }} className="px-2 py-1 bg-gray-500 text-white rounded text-xs">✕</button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button onClick={(e) => { e.stopPropagation(); startFolderRename(folder); }} className="px-2 py-1 bg-yellow-500 text-white rounded text-sm cursor-pointer">✏️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); downloadFolder(folder.id, folder.name); }} className="px-2 py-1 bg-blue-500 text-white rounded text-sm cursor-pointer">⬇️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteFolderById(folder.id); }} className="px-2 py-1 bg-red-500 text-white rounded text-sm cursor-pointer">🗑️</button>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         ))}
                         {sortedAndFilteredFiles.map((file) => (
@@ -829,7 +1020,7 @@ export default function FilesPage() {
                                     onClick={(e) => e.stopPropagation()}
                                     className="absolute top-3 left-3 w-5 h-5 cursor-pointer z-10"
                                 />
-                                <Link href={`/files/${file.id}`} className="block mb-3">
+                                <Link href={`/files/${file.id}${file.folder_id ? `?folderId=${file.folder_id}` : ''}`} className="block mb-3">
                                     {file.thumbnailUrl ? (
                                         <img src={file.thumbnailUrl} alt={file.filename} className="w-full h-64 object-cover rounded mb-3" />
                                     ) : (
@@ -900,23 +1091,50 @@ export default function FilesPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                               {currentFolder === null && folders.map(folder => (
+                               {currentFolder === null && filteredFolders.map(folder => (
                                     <tr 
                                         key={`folder-${folder.id}`} 
                                         className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer"
-                                        onClick={() => openFolder(folder.id)}
+                                        onClick={() => router.push(`/files/folder/${folder.id}`)}
                                         onDrop={(e) => onDrop(e, folder.id)}
                                         onDragOver={onDragOver}
                                     >
-                                        <td className="p-3"></td>
+                                        <td className="p-3">
+                                            <div className="flex gap-2 justify-end">
+                                                {renamingFolderId === folder.id ? (
+                                                    <>
+                                                        <input
+                                                            type="text"
+                                                            value={renameFolderValue}
+                                                            onChange={(e) => setRenameFolderValue(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') saveFolderRename(folder.id);
+                                                                if (e.key === 'Escape') cancelFolderRename();
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="px-2 py-1 border border-blue-500 rounded text-sm w-40"
+                                                            autoFocus
+                                                        />
+                                                        <button onClick={(e) => { e.stopPropagation(); saveFolderRename(folder.id); }} className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs">✓</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); cancelFolderRename(); }} className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-xs">✕</button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button onClick={(e) => { e.stopPropagation(); startFolderRename(folder); }} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-sm cursor-pointer" title="Rename">✏️</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); downloadFolder(folder.id, folder.name); }} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm cursor-pointer">Download</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); deleteFolderById(folder.id); }} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm cursor-pointer">Delete</button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="p-3">
                                             <div className="w-12 h-12 flex items-center justify-center text-2xl">📁</div>
                                         </td>
                                         <td className="p-3">
                                             <span className="text-gray-900 dark:text-gray-100 font-medium">{folder.name}</span>
                                         </td>
-                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">—</td>
-                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">—</td>
+                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{formatFileSize(getFolderSize(folder.id))}</td>
+                                        <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{folder.created_at ? formatDateTime(folder.created_at) : '—'}</td>
                                         <td className="p-3"></td>
                                     </tr>
                                 ))}
@@ -939,7 +1157,7 @@ export default function FilesPage() {
                                             />
                                         </td>
                                         <td className="p-3">
-                                            <Link href={`/files/${file.id}`}>
+                                            <Link href={`/files/${file.id}${file.folder_id ? `?folderId=${file.folder_id}` : ''}`}>
                                                 {file.thumbnailUrl ? (
                                                     <img src={file.thumbnailUrl} alt={file.filename} className="w-12 h-12 object-cover rounded" />
                                                 ) : (
@@ -976,7 +1194,7 @@ export default function FilesPage() {
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <Link href={`/files/${file.id}`} className="hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block max-w-xs" title={file.filename}>
+                                                <Link href={`/files/${file.id}${file.folder_id ? `?folderId=${file.folder_id}` : ''}`} className="hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block max-w-xs" title={file.filename}>
                                                     {file.filename}
                                                 </Link>
                                             )}
@@ -1000,17 +1218,46 @@ export default function FilesPage() {
                 {/* List View */}
                 {viewMode === "list" && (
                     <div className="space-y-2">
-                        {currentFolder === null && folders.map(folder => (
+                        {currentFolder === null && filteredFolders.map(folder => (
                             <div 
                                 key={`folder-${folder.id}`} 
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition flex items-center justify-between bg-white dark:bg-gray-800 cursor-pointer"
-                                onClick={() => openFolder(folder.id)}
+                                onClick={() => router.push(`/files/folder/${folder.id}`)}
                                 onDrop={(e) => onDrop(e, folder.id)}
                                 onDragOver={onDragOver}
                             >
                                 <div className="flex items-center gap-4">
                                     <div className="text-4xl">📁</div>
-                                    <div className="font-medium text-gray-900 dark:text-gray-100">{folder.name}</div>
+                                    <div>
+                                        <div className="font-medium text-gray-900 dark:text-gray-100">{folder.name}</div>
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">{formatFileSize(getFolderSize(folder.id))}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {renamingFolderId === folder.id ? (
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={renameFolderValue}
+                                                onChange={(e) => setRenameFolderValue(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') saveFolderRename(folder.id);
+                                                    if (e.key === 'Escape') cancelFolderRename();
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="px-2 py-1 border border-blue-500 rounded text-sm w-48"
+                                                autoFocus
+                                            />
+                                            <button onClick={(e) => { e.stopPropagation(); saveFolderRename(folder.id); }} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
+                                            <button onClick={(e) => { e.stopPropagation(); cancelFolderRename(); }} className="px-2 py-1 bg-gray-500 text-white rounded text-xs">✕</button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button onClick={(e) => { e.stopPropagation(); startFolderRename(folder); }} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-sm cursor-pointer">✏️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); downloadFolder(folder.id, folder.name); }} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm cursor-pointer">Download</button>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteFolderById(folder.id); }} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm cursor-pointer">Delete</button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -1031,7 +1278,7 @@ export default function FilesPage() {
                                     className="w-5 h-5 cursor-pointer mr-4"
                                 />
                                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                                    <Link href={`/files/${file.id}`}>
+                                    <Link href={`/files/${file.id}${file.folder_id ? `?folderId=${file.folder_id}` : ''}`}>
                                         {file.thumbnailUrl ? (
                                             <img src={file.thumbnailUrl} alt={file.filename} className="w-16 h-16 object-cover rounded" />
                                         ) : (
@@ -1068,7 +1315,7 @@ export default function FilesPage() {
                                             </div>
                                         ) : (
                                             <>
-                                                <Link href={`/files/${file.id}`} className="font-medium hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block" title={file.filename}>
+                                                <Link href={`/files/${file.id}${file.folder_id ? `?folderId=${file.folder_id}` : ''}`} className="font-medium hover:text-blue-600 dark:hover:text-blue-400 text-gray-900 dark:text-gray-100 truncate block" title={file.filename}>
                                                     {file.filename}
                                                 </Link>
                                                 <div className="text-sm text-gray-600 dark:text-gray-400">{(file.file_size / 1024).toFixed(1)} KB</div>

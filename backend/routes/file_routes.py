@@ -1,11 +1,11 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from typing import List
 from sqlalchemy.orm import Session
 from io import BytesIO
 
 from core.security import get_current_user
 from core.database import get_db
-from models import User, UserFile, FileStorageHistory
+from models import User, UserFile, FileStorageHistory, Folder
 from schemas.file_schemas import FileDetailResponse, FileListItem
 from services.s3_client import upload_file_to_s3, delete_file_from_s3, generate_presigned_url, generate_download_url, copy_file_in_s3, copy_file_in_s3
 from datetime import datetime, timedelta
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/files", tags=["Files"])
 async def upload_files(
     files: List[UploadFile] = File(...),
     folder_id: int | None = None,
+    folder_name: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -24,12 +25,57 @@ async def upload_files(
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
+    # If folder_name is provided, create a new folder and use its ID
+    if folder_name:
+        # Check if folder already exists under root
+        existing = db.query(Folder).filter(
+            Folder.user_id == current_user.id,
+            Folder.parent_id == None,
+            Folder.name == folder_name
+        ).first()
+        
+        if existing:
+            folder_id = existing.id
+        else:
+            # Create new folder
+            new_folder = Folder(
+                name=folder_name,
+                user_id=current_user.id,
+                parent_id=None
+            )
+            db.add(new_folder)
+            db.commit()
+            db.refresh(new_folder)
+            folder_id = new_folder.id
+
     for file in files:
         filename = file.filename
+        # Extract just the basename from the filename (in case it contains path separators)
+        import os
+        filename = os.path.basename(filename)
+        
         if folder_id:
             key = f"users/{current_user.id}/folders/{folder_id}/{filename}"
         else:
             key = f"users/{current_user.id}/{filename}"
+
+        # Check if file with same name already exists for this user in the same folder
+        existing_file = (
+            db.query(UserFile)
+            .filter(
+                UserFile.user_id == current_user.id,
+                UserFile.filename == filename,
+                UserFile.folder_id == folder_id,
+                UserFile.deleted_at.is_(None)
+            )
+            .first()
+        )
+        
+        if existing_file:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File '{filename}' already exists in this location. Please rename the file or delete the existing one first."
+            )
 
         # ✅ Read file into memory
         file_bytes = await file.read()
@@ -294,6 +340,25 @@ async def rename_file(
     if not file_record:
         raise HTTPException(status_code=404, detail="File not found")
     
+    # Check if a file with the new name already exists in the same location
+    # (excluding the current file being renamed)
+    existing_file = (
+        db.query(UserFile)
+        .filter(
+            UserFile.user_id == current_user.id,
+            UserFile.filename == new_filename,
+            UserFile.folder_id == file_record.folder_id,
+            UserFile.deleted_at.is_(None),
+            UserFile.id != file_id  # Exclude the current file
+        )
+        .first()
+    )
+    
+    if existing_file:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File '{new_filename}' already exists in this location. Please choose a different name."
+        )
     old_key = file_record.file_key
     
     # Generate new S3 key with the new filename
