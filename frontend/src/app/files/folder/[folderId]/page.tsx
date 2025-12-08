@@ -153,14 +153,14 @@ export default function FolderPage() {
 
   const moveToRoot = async (id: number) => {
     try {
-      await getJsonWithAuth("/folders/move", {
+      const response = await getJsonWithAuth("/folders/move", {
         method: "POST",
         body: JSON.stringify({ file_id: id, folder_id: null }),
         headers: { "Content-Type": "application/json" }
       });
       setFiles(prev => prev.filter(f => f.id !== id));
     } catch (err: any) {
-      alert("Failed to move file: " + err.message);
+      alert("Failed to move file: " + (err.message || "Unknown error"));
     }
   };
 
@@ -168,17 +168,35 @@ export default function FolderPage() {
     if (selectedFiles.size === 0) return;
     if (!confirm(`Move ${selectedFiles.size} file(s) to root?`)) return;
     try {
-      await Promise.all(Array.from(selectedFiles).map(id => 
-        getJsonWithAuth("/folders/move", {
-          method: "POST",
-          body: JSON.stringify({ file_id: id, folder_id: null }),
-          headers: { "Content-Type": "application/json" }
-        })
-      ));
-      setFiles(prev => prev.filter(f => !selectedFiles.has(f.id)));
+      const results = await Promise.all(Array.from(selectedFiles).map(async (id) => {
+        try {
+          await getJsonWithAuth("/folders/move", {
+            method: "POST",
+            body: JSON.stringify({ file_id: id, folder_id: null }),
+            headers: { "Content-Type": "application/json" }
+          });
+          return { success: true, id };
+        } catch (err: any) {
+          return { success: false, id, error: err.message || "Unknown error" };
+        }
+      }));
+
+      const errors = results.filter(r => !r.success);
+      const successes = results.filter(r => r.success);
+
+      if (errors.length > 0) {
+        const errorMessages = errors.map(e => `${e.error}`).join("\n");
+        alert(`Some files could not be moved:\n${errorMessages}`);
+      }
+
+      if (successes.length > 0) {
+        const successIds = successes.map(s => s.id);
+        setFiles(prev => prev.filter(f => !successIds.includes(f.id)));
+      }
+
       setSelectedFiles(new Set());
     } catch (err: any) {
-      alert("Failed to move files: " + err.message);
+      alert("Failed to move files: " + (err.message || "Unknown error"));
     }
   };
 

@@ -595,9 +595,9 @@ export default function FilesPage() {
 
         try {
             // Move all selected files to the folder
-            await Promise.all(
-                fileIds.map(fileId =>
-                    fetch("http://127.0.0.1:8000/folders/move", {
+            const results = await Promise.all(
+                fileIds.map(async (fileId) => {
+                    const res = await fetch("http://127.0.0.1:8000/folders/move", {
                         method: "POST",
                         headers: {
                             "Authorization": `Bearer ${token}`,
@@ -607,16 +607,35 @@ export default function FilesPage() {
                             file_id: fileId,
                             folder_id: folderId,
                         }),
-                    })
-                )
+                    });
+
+                    const data = await res.json();
+                    
+                    if (!res.ok) {
+                        return { success: false, fileId, error: data.detail || "Failed to move" };
+                    }
+                    return { success: true, fileId };
+                })
             );
 
-            // Update UI: move files to folder
-            setFiles(prev =>
-                prev.map(f => 
-                    fileIds.includes(f.id) ? { ...f, folder_id: folderId } : f
-                )
-            );
+            // Check for any errors
+            const errors = results.filter(r => !r.success);
+            const successes = results.filter(r => r.success);
+
+            if (errors.length > 0) {
+                const errorMessages = errors.map(e => `${e.error}`).join("\n");
+                alert(`Some files could not be moved:\n${errorMessages}`);
+            }
+
+            // Only update UI for successful moves
+            if (successes.length > 0) {
+                const successIds = successes.map(s => s.fileId);
+                setFiles(prev =>
+                    prev.map(f => 
+                        successIds.includes(f.id) ? { ...f, folder_id: folderId } : f
+                    )
+                );
+            }
             
             // Clear selection
             setSelectedFiles(new Set());

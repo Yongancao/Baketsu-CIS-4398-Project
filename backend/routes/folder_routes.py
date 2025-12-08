@@ -81,6 +81,21 @@ def move_file(
     if not file_record:
         raise HTTPException(404, "File not found")
 
+    # Check if a file with the same name already exists in the target location
+    existing_file = db.query(UserFile).filter(
+        UserFile.user_id == current_user.id,
+        UserFile.filename == file_record.filename,
+        UserFile.folder_id == folder_id,
+        UserFile.id != file_id,
+        UserFile.deleted_at.is_(None)
+    ).first()
+
+    if existing_file:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File '{file_record.filename}' already exists in the target location. Please rename the file first."
+        )
+
     file_record.folder_id = folder_id
     db.commit()
     db.refresh(file_record)
