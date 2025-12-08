@@ -4,6 +4,7 @@ import ProtectedPage from "@/components/ProtectedPage";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
+  const [folderName, setFolderName] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
@@ -51,6 +52,11 @@ export default function UploadPage() {
       // Build FormData
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file)); // multi-file support
+      
+      // Send folder name if a folder was selected
+      if (folderName) {
+        formData.append("folder_name", folderName);
+      }
 
       console.log("📤 Sending files to FastAPI backend...");
 
@@ -112,6 +118,31 @@ export default function UploadPage() {
             type="file"
             multiple
             onChange={handleFileSelect}
+            className="hidden"
+          />
+          <label
+            htmlFor="folderInput"
+            className="cursor-pointer mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Select Folder
+          </label>
+          <input
+            id="folderInput"
+            type="file"
+            // @ts-ignore webkitdirectory is supported in chromium-based browsers
+            webkitdirectory="true"
+            directory="true"
+            multiple
+            onChange={(e) => {
+              const selected = e.target.files ? Array.from(e.target.files) : [];
+              setFiles(selected);
+              // Extract folder name from webkitRelativePath (e.g., "FolderName/file.txt")
+              if (selected.length > 0 && (selected[0] as any).webkitRelativePath) {
+                const firstPath = (selected[0] as any).webkitRelativePath;
+                const folderNameFromPath = firstPath.split('/')[0];
+                setFolderName(folderNameFromPath);
+              }
+            }}
             className="hidden"
           />
         </div>

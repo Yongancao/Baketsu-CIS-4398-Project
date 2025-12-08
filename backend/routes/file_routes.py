@@ -1,11 +1,11 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from typing import List
 from sqlalchemy.orm import Session
 from io import BytesIO
 
 from core.security import get_current_user
 from core.database import get_db
-from models import User, UserFile, FileStorageHistory
+from models import User, UserFile, FileStorageHistory, Folder
 from schemas.file_schemas import FileDetailResponse, FileListItem
 from services.s3_client import upload_file_to_s3, delete_file_from_s3, generate_presigned_url, generate_download_url, copy_file_in_s3, copy_file_in_s3
 from datetime import datetime, timedelta
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/files", tags=["Files"])
 async def upload_files(
     files: List[UploadFile] = File(...),
     folder_id: int | None = None,
+    folder_name: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -24,8 +25,35 @@ async def upload_files(
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
+    # If folder_name is provided, create a new folder and use its ID
+    if folder_name:
+        # Check if folder already exists under root
+        existing = db.query(Folder).filter(
+            Folder.user_id == current_user.id,
+            Folder.parent_id == None,
+            Folder.name == folder_name
+        ).first()
+        
+        if existing:
+            folder_id = existing.id
+        else:
+            # Create new folder
+            new_folder = Folder(
+                name=folder_name,
+                user_id=current_user.id,
+                parent_id=None
+            )
+            db.add(new_folder)
+            db.commit()
+            db.refresh(new_folder)
+            folder_id = new_folder.id
+
     for file in files:
         filename = file.filename
+        # Extract just the basename from the filename (in case it contains path separators)
+        import os
+        filename = os.path.basename(filename)
+        
         if folder_id:
             key = f"users/{current_user.id}/folders/{folder_id}/{filename}"
         else:
@@ -278,7 +306,10 @@ async def list_files(
             "id": file.id,
             "filename": file.filename,
             "file_size": file.file_size,
-            "uploaded_at": uploaded_at
+            "uploaded_at": uploaded_at,
+            "preview_url": generate_presigned_url(file.file_key),
+            "download_url": generate_download_url(file.file_key, file.filename),
+            "folder_id": file.folder_id
         })
     
     return result
@@ -406,9 +437,54 @@ async def get_file_details(
         uploaded_at = None
 
     return {
+        "folder_id": file_record.folder_id,
         "id": file_record.id,
         "filename": file_record.filename,
         "file_size": file_record.file_size,
         "preview_url": preview_url,
         "uploaded_at": uploaded_at,
     }
+
+@router.get("/in-folder/{folder_id}")
+def get_files_in_folder(
+    folder_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    from datetime import datetime, timezone
+
+    files = db.query(UserFile).filter(
+        UserFile.user_id == current_user.id,
+        UserFile.folder_id == folder_id
+    ).all()
+
+    result = []
+    for f in files:
+
+        print("DEBUG FILE KEY:", f.file_key)
+
+        # --- Ensure uploaded_at is ISO formatted like /files/list ---
+        uploaded_at = f.uploaded_at
+        if isinstance(uploaded_at, str):
+            try:
+                dt = datetime.strptime(uploaded_at, "%Y-%m-%d %H:%M:%S")
+                uploaded_at = dt.replace(tzinfo=timezone.utc).isoformat()
+            except:
+                pass
+        elif isinstance(uploaded_at, datetime):
+            if uploaded_at.tzinfo is None:
+                uploaded_at = uploaded_at.replace(tzinfo=timezone.utc)
+            uploaded_at = uploaded_at.isoformat()
+        # ----------------------------------------------------------------
+
+        result.append({
+            "id": f.id,
+            "filename": f.filename,
+            "file_size": f.file_size,
+            "uploaded_at": uploaded_at,
+            "preview_url": generate_presigned_url(f.file_key),
+            "download_url": generate_download_url(f.file_key, f.filename),
+            "folder_id": f.folder_id
+        })
+
+    return result

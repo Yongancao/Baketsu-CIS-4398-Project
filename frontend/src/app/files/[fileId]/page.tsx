@@ -3,10 +3,15 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getJsonWithAuth, fetchTextUrl } from "@/lib/api";
+import { isImage, isPDF, isVideo, isAudio, isText, formatDateTime } from "@/lib/fileUtils";
+import PreviewRenderer from "@/components/PreviewRenderer";
 
 export default function FilePreviewPage() {
     const { fileId } = useParams();
     const router = useRouter();
+    const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const folderId = searchParams.get('folderId');
 
     const [fileData, setFileData] = useState<any>(null);
     const [textContent, setTextContent] = useState("");
@@ -15,31 +20,8 @@ export default function FilePreviewPage() {
     const [isRenaming, setIsRenaming] = useState(false);
     const [renameValue, setRenameValue] = useState("");
 
-    // File type helpers
-    const isImage = (name: string) => /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(name);
-    const isPDF = (name: string) => /\.pdf$/i.test(name);
-    const isVideo = (name: string) => /\.(mp4|mov|webm|avi|mkv)$/i.test(name);
-    const isAudio = (name: string) => /\.(mp3|wav|ogg|m4a)$/i.test(name);
-    const isText = (name: string) => /\.(txt|md|log|json|xml|csv|html|css|js|ts|tsx|jsx|py|java|c|cpp|h|yml|yaml)$/i.test(name);
+    // File type helpers and formatting are provided by shared utilities in `src/lib`
 
-    const formatDateTime = (dateString: string | null | undefined): string => {
-        if (!dateString) return 'N/A';
-        try {
-            const date = new Date(dateString);
-            // Format: Month DD, YYYY at HH:MM (24-hour) Timezone
-            return date.toLocaleString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-                timeZoneName: 'short'
-            });
-        } catch {
-            return 'N/A';
-        }
-    };
 
     async function handleDownload() {
         const token = localStorage.getItem("access_token");
@@ -148,35 +130,28 @@ export default function FilePreviewPage() {
         }
 
         // Fetch file details from backend
-        fetch(`http://127.0.0.1:8000/files/${fileId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((res) => {
-                if (!res.ok) throw new Error("File not found");
-                return res.json();
-            })
-            .then(async (data) => {
+        (async () => {
+            try {
+                const data = await getJsonWithAuth(`/files/${fileId}`);
                 console.log("FILE DATA:", data);
                 setFileData(data);
 
                 // If it's text, fetch raw content from presigned URL
-                if (isText(data.filename)) {
+                if (isText(data.filename) && data.preview_url) {
                     try {
-                        const textRes = await fetch(data.preview_url);
-                        if (textRes.ok) {
-                            const text = await textRes.text();
-                            setTextContent(text);
-                        }
+                        const text = await fetchTextUrl(data.preview_url);
+                        setTextContent(text);
                     } catch (err) {
                         console.error("Failed to load text content:", err);
                     }
                 }
-            })
-            .catch((err) => {
+            } catch (err) {
                 console.error(err);
                 setError("Failed to load file preview.");
-            })
-            .finally(() => setLoading(false));
+            } finally {
+                setLoading(false);
+            }
+        })();
     }, [fileId]);
 
     // Rendering states
@@ -187,8 +162,11 @@ export default function FilePreviewPage() {
     return (
         <div className="p-8 pt-24">
             <div className="flex justify-between items-center mb-4">
-                <Link href="/files" className="text-blue-500 hover:text-blue-700 underline">
-                    ← Back to Files
+                <Link
+                    href={folderId ? `/files/folder/${folderId}` : "/files"}
+                    className="text-blue-500 hover:text-blue-700 underline"
+                >
+                    ← Back to {folderId ? "Folder" : "Files"}
                 </Link>
                 
                 <div className="flex gap-2">
