@@ -13,6 +13,8 @@ export default function FilesPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [fileTypeFilter, setFileTypeFilter] = useState<"all" | "images" | "videos" | "documents" | "audio" | "other">("all");
     const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
+    const [sortBy, setSortBy] = useState<"name" | "size" | "date">("name");
+    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
     const [viewMode, setViewMode] = useState<"small" | "medium" | "large" | "details" | "list">(() => {
         if (typeof window !== "undefined") {
             return (localStorage.getItem("filesViewMode") as any) || "medium";
@@ -75,6 +77,33 @@ export default function FilesPage() {
     };
 
     // ----------------------
+    // SORT FUNCTIONS
+    // ----------------------
+    const sortedAndFilteredFiles = [...filteredFiles].sort((a, b) => {
+        let comparison = 0;
+
+        switch (sortBy) {
+            case "name":
+                comparison = a.filename.toLowerCase().localeCompare(b.filename.toLowerCase());
+                break;
+            case "size":
+                comparison = a.file_size - b.file_size;
+                break;
+            case "date":
+                const dateA = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0;
+                const dateB = b.uploaded_at ? new Date(b.uploaded_at).getTime() : 0;
+                comparison = dateA - dateB;
+                break;
+        }
+
+        return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    const toggleSortOrder = () => {
+        setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    };
+
+    // ----------------------
     // MULTI-SELECT FUNCTIONS
     // ----------------------
     const toggleFileSelection = (fileId: number) => {
@@ -90,10 +119,10 @@ export default function FilesPage() {
     };
 
     const selectAllFiles = () => {
-        if (selectedFiles.size === filteredFiles.length) {
+        if (selectedFiles.size === sortedAndFilteredFiles.length) {
             setSelectedFiles(new Set());
         } else {
-            setSelectedFiles(new Set(filteredFiles.map(f => f.id)));
+            setSelectedFiles(new Set(sortedAndFilteredFiles.map(f => f.id)));
         }
     };
 
@@ -418,6 +447,27 @@ export default function FilesPage() {
                     </div>
                 </div>
 
+                {/* Sort Controls */}
+                <div className="mb-4 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center gap-4">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
+                    <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as any)}
+                        className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                        <option value="name">Name</option>
+                        <option value="size">Size</option>
+                        <option value="date">Date Uploaded</option>
+                    </select>
+                    <button
+                        onClick={toggleSortOrder}
+                        className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition text-sm flex items-center gap-2"
+                        title={`Sort ${sortOrder === "asc" ? "Ascending" : "Descending"}`}
+                    >
+                        {sortOrder === "asc" ? "↑ Ascending" : "↓ Descending"}
+                    </button>
+                </div>
+
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-4">
                         <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Your Files & Folders</h1>
@@ -449,12 +499,12 @@ export default function FilesPage() {
                                 </button>
                             </>
                         )}
-                        {filteredFiles.length > 0 && (
+                        {sortedAndFilteredFiles.length > 0 && (
                             <button
                                 onClick={selectAllFiles}
                                 className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition text-gray-900 dark:text-white"
                             >
-                                {selectedFiles.size === filteredFiles.length ? "Deselect All" : "Select All"}
+                                {selectedFiles.size === sortedAndFilteredFiles.length ? "Deselect All" : "Select All"}
                             </button>
                         )}
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</label>
@@ -486,7 +536,7 @@ export default function FilesPage() {
                                 <div className="text-xs truncate text-gray-900 dark:text-gray-100 text-center" title={folder.name}>{folder.name}</div>
                             </div>
                         ))}
-                        {filteredFiles.map((file) => (
+                        {sortedAndFilteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
                                 draggable
@@ -526,10 +576,10 @@ export default function FilesPage() {
                                 onDragOver={onDragOver}
                             >
                                 <span className="text-6xl">📁</span>
-                                <div className="text-xl font-medium text-gray-900 dark:text-gray-100">{folder.name}</div>
+                                <div className="mt-2 font-medium text-gray-900 dark:text-gray-100">{folder.name}</div>
                             </div>
                         ))}
-                        {filteredFiles.map((file) => (
+                        {sortedAndFilteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
                                 draggable
@@ -581,7 +631,7 @@ export default function FilesPage() {
                                 <div className="mt-3 font-medium text-lg text-gray-900 dark:text-gray-100">{folder.name}</div>
                             </div>
                         ))}
-                        {filteredFiles.map((file) => (
+                        {sortedAndFilteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
                                 draggable
@@ -628,7 +678,7 @@ export default function FilesPage() {
                                     <th className="text-left p-3 font-medium text-gray-900 dark:text-gray-100 w-12">
                                         <input
                                             type="checkbox"
-                                            checked={filteredFiles.length > 0 && selectedFiles.size === filteredFiles.length}
+                                            checked={sortedAndFilteredFiles.length > 0 && selectedFiles.size === sortedAndFilteredFiles.length}
                                             onChange={selectAllFiles}
                                             className="w-4 h-4 cursor-pointer"
                                         />
@@ -660,7 +710,7 @@ export default function FilesPage() {
                                         <td className="p-3"></td>
                                     </tr>
                                 ))}
-                                {filteredFiles.map((file) => (
+                                {sortedAndFilteredFiles.map((file) => (
                                     <tr 
                                         key={file.id} 
                                         draggable
@@ -723,7 +773,7 @@ export default function FilesPage() {
                                 </div>
                             </div>
                         ))}
-                        {filteredFiles.map((file) => (
+                        {sortedAndFilteredFiles.map((file) => (
                             <div 
                                 key={file.id} 
                                 draggable
