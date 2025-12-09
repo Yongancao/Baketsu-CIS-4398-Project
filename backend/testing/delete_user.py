@@ -1,6 +1,10 @@
 from core.database import SessionLocal
 from models.user import User
 
+# Change email to the one you want to delete
+# To delete user run  
+# python3 -m testing.delete_user
+
 # Create a real DB session manually (not using Depends)
 db = SessionLocal()
 
