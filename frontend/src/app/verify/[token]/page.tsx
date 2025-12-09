@@ -26,7 +26,7 @@ export default function VerifyPage(props: { params: Promise<{ token: string }> }
 
     return (
         <div className="flex justify-center items-center min-h-screen">
-            <p className="text-xl">{status}</p>
+            <p className="text-xl dark:text-white text-black">{status}</p>
         </div>
     );
 }

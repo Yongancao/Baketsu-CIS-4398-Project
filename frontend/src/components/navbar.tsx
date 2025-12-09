@@ -26,6 +26,7 @@ export default function Navbar() {
                     <Link href="/upload" className="hover:underline"> Upload </Link>
                     <Link href="/dashboard" className="hover:underline"> Dashboard </Link>
                     <Link href="/files" className="hover:underline"> Files </Link>
+                    <Link href="/billing" className="hover:underline"> Billing </Link>
                     <button onClick={logout} className="hover:text-red-500">
                         Logout
                     </button>
