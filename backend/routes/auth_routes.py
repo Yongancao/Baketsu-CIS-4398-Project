@@ -26,7 +26,7 @@ def register(payload: RegisterSchema, db: Session = Depends(get_db)):
     new_user = User(
         email=payload.email.lower(),
         password=hash_password(payload.password),
-        name=payload.name,
+        name=payload.name.capitalize(),
         is_verified=False,
         verification_token=generate_verification_token()
     )
