@@ -165,6 +165,25 @@ export default function FilesPage() {
         return true;
     });
 
+    // Sort folders by name, size, or date uploaded
+    const sortedAndFilteredFolders = [...filteredFolders].sort((a, b) => {
+        let comparison = 0;
+        switch (sortBy) {
+            case "name":
+                comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+                break;
+            case "size":
+                comparison = getFolderSize(a.id) - getFolderSize(b.id);
+                break;
+            case "date":
+                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                comparison = dateA - dateB;
+                break;
+        }
+        return sortOrder === "asc" ? comparison : -comparison;
+    });
+
     const clearFilters = () => {
         setSearchQuery("");
         setFileTypeFilter("all");
@@ -847,7 +866,7 @@ export default function FilesPage() {
                 {/* Small Icons View */}
                 {viewMode === "small" && (
                     <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                        {currentFolder === null && filteredFolders.map(folder => (
+                        {currentFolder === null && sortedAndFilteredFolders.map(folder => (
                             <div
                                 key={`folder-${folder.id}`}
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 cursor-pointer"
@@ -922,7 +941,7 @@ export default function FilesPage() {
                 {/* Medium Icons View */}
                 {viewMode === "medium" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {currentFolder === null && filteredFolders.map(folder => (
+                        {currentFolder === null && sortedAndFilteredFolders.map(folder => (
                             <div
                                 key={`folder-${folder.id}`}
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 flex flex-col items-center justify-center cursor-pointer"
@@ -1031,7 +1050,7 @@ export default function FilesPage() {
                 {/* Large Icons View */}
                 {viewMode === "large" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {currentFolder === null && filteredFolders.map(folder => (
+                        {currentFolder === null && sortedAndFilteredFolders.map(folder => (
                             <div
                                 key={`folder-${folder.id}`}
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition bg-white dark:bg-gray-800 flex flex-col items-center justify-center cursor-pointer"
@@ -1159,7 +1178,7 @@ export default function FilesPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {currentFolder === null && filteredFolders.map(folder => (
+                            {currentFolder === null && sortedAndFilteredFolders.map(folder => (
                             <tr
                                 key={`folder-${folder.id}`}
                                 className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer"
@@ -1294,7 +1313,7 @@ export default function FilesPage() {
                 {/* List View */}
                 {viewMode === "list" && (
                     <div className="space-y-2">
-                        {currentFolder === null && filteredFolders.map(folder => (
+                        {currentFolder === null && sortedAndFilteredFolders.map(folder => (
                             <div 
                                 key={`folder-${folder.id}`} 
                                 className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition flex items-center justify-between bg-white dark:bg-gray-800 cursor-pointer"
