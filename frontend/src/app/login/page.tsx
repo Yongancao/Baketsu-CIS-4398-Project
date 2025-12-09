@@ -55,7 +55,7 @@ export default function LoginPage() {
     <div className="flex flex-col items-center justify-center min-h-screen text-black dark:text-white">
       <form
         onSubmit={handleLogin}
-        className="bg-white dark:bg-[#151516] p-8 rounded-2xl shadow-md border"
+        className="flex flex-col bg-white dark:bg-[#151516] p-8 rounded-2xl shadow-md border"
       >
         <h1 className="text-2xl font-bold mb-4">Login</h1>
 
