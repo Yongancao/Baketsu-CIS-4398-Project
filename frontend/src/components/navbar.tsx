@@ -22,18 +22,18 @@ export default function Navbar() {
             </div> 
             {isLoggedIn ? (
                 <>
-                    <Link href="/" className="hover:underline"> Home </Link>    
-                    <Link href="/upload" className="hover:underline"> Upload </Link>
-                    <Link href="/dashboard" className="hover:underline"> Dashboard </Link>
-                    <Link href="/files" className="hover:underline"> Files </Link>
-                    <button onClick={logout} className="hover:text-red-500">
+                    <Link href="/" className="hover:underline font-bold"> Home </Link>    
+                    <Link href="/upload" className="hover:underline font-bold"> Upload </Link>
+                    <Link href="/dashboard" className="hover:underline font-bold"> Dashboard </Link>
+                    <Link href="/files" className="hover:underline font-bold"> Files </Link>
+                    <button onClick={logout} className="hover:text-red-500 font-bold">
                         Logout
                     </button>
                     <div className="pl-10 pr-15"><DarkModeToggle/></div>
                 </>
             ) : (
                 <>
-                    <div className="flex items-center gap-10">
+                    <div className="flex items-center gap-10 font-bold">
                         <Link href="/register" className="hover:underline"> Register </Link>
                         <Link href="/login" className="hover:underline"> Login </Link>
                         <div className="pl-5 pr-15"><DarkModeToggle/></div>
