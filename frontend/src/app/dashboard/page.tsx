@@ -167,7 +167,7 @@ export default function DashboardPage() {
             <header className="mb-10">
               <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
               <p className="text-gray-500 dark:text-gray-400 mt-2">
-                Welcome back, <span className="font-medium text-gray-900 dark:text-white">{user?.username || user?.name}</span>! Here&apos;s your storage overview.
+                Welcome back, <span className="font-medium text-gray-900 dark:text-white">{user?.username || user?.name.capitalize()}</span>! Here&apos;s your storage overview.
               </p>
             </header>
 
