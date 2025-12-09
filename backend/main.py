@@ -5,6 +5,7 @@ from routes.auth_routes import router as auth_router
 from routes.file_routes import router as file_router
 from routes.storage_routes import router as storage_router
 from routes.folder_routes import router as folder_router
+from routes.billing_routes import router as billing_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -23,3 +24,4 @@ app.include_router(auth_router)
 app.include_router(file_router)
 app.include_router(storage_router)
 app.include_router(folder_router)
+app.include_router(billing_router)
