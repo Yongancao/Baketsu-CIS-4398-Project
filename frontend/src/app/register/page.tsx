@@ -118,7 +118,7 @@ export default function RegisterPage() {
             Register
           </button>
 
-          {error && <p className="text-red-500 mt-2">{error}</p>}
+          <div className="max-w-65">{error && <p className="text-red-500 mt-2">{error}</p>}</div>
         </form>
       )}
 

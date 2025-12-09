@@ -1,10 +1,10 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field
 
 class RegisterSchema(BaseModel):
-    name: str = Field(..., min_length=1, description="Name is required")
-    email: EmailStr = Field(..., min_length=1, description="Email is not in correct format")
-    password: str = Field(..., min_length=1, description="Password is required")
-    confirm_password: str = Field(..., min_length=1, description="Password confirmation is required")
+    name: str = Field(..., min_length=1)
+    email: EmailStr = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+    confirm_password: str = Field(..., min_length=1)
 
 class LoginSchema(BaseModel):
     email: str
