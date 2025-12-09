@@ -8,7 +8,7 @@ from models.user import User
 # Create a real DB session manually (not using Depends)
 db = SessionLocal()
 
-email = "jun1234@gmail.com"  # change as needed
+email = ""  # change as needed
 
 user = db.query(User).filter(User.email == email).first()
 

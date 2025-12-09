@@ -244,7 +244,7 @@ export default function DashboardPage() {
                 )}
 
                 <Link href="/upload" className="block mt-6">
-                  <button className="w-full py-3 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all font-medium active:scale-[0.98]">
+                  <button className="w-full py-3 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all font-medium active:scale-[0.98] hover:cursor-pointer">
                     <Icons.UploadCloud />
                     <span>Upload New Files</span>
                   </button>

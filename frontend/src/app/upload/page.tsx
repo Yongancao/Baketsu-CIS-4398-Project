@@ -151,7 +151,7 @@ export default function UploadPage() {
         <button
           onClick={handleUpload}
           disabled={files.length === 0 || uploading}
-          className="mt-6 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:bg-gray-400"
+          className="mt-6 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:bg-gray-400 hover:cursor-pointer"
         >
           {uploading ? "Uploading..." : "Upload"}
         </button>
