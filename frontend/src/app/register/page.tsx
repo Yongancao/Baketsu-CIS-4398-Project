@@ -11,7 +11,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false); // ⬅️ NEW
+  const [loading, setLoading] = useState(false);
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -38,16 +38,24 @@ export default function RegisterPage() {
     const data = await res.json();
 
     if (!res.ok) {
-      setError(data.detail || "Registration failed. Please try again.");
+      let message = "Registration failed. Please try again.";
+
+      if (Array.isArray(data.detail)) {
+        message = data.detail[0]?.msg || message;
+      }
+      else if (typeof data.detail === "string") {
+        message = data.detail;
+      }
+
+      setError(message);
       setLoading(false);
       return;
     }
 
+
     console.log("✅ Registration Successful:", data);
 
-    setTimeout(() => {
-      router.push("/register/success");
-    }, 300);
+    router.push("/register/success");
 
   }
 
