@@ -153,7 +153,14 @@ export default function UploadPage() {
           disabled={files.length === 0 || uploading}
           className="mt-6 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:bg-gray-400 hover:cursor-pointer"
         >
-          {uploading ? "Uploading..." : "Upload"}
+          {uploading ? (
+          <div className="text-center">
+            <p className="flex justify-center">
+              Uploading
+              <span className="animate-ellipsis ml-1"></span>
+            </p>
+          </div>
+        ) : "Upload"}
         </button>
 
         {message && <p className="mt-4 text-center">{message}</p>}

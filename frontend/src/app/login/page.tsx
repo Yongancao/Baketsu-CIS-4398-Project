@@ -82,7 +82,14 @@ export default function LoginPage() {
           disabled={loading}
           className="bg-[#4267B2] text-white px-4 py-2 m-2 rounded-lg hover:bg-gray-800 hover:cursor-pointer disabled:opacity-60"
         >
-          {loading ? "Logging in..." : "Login"}
+          {loading ? (
+            <div className="text-center">
+              <p className="flex justify-center">
+                Logging in...
+                <span className="animate-ellipsis ml-1"></span>
+              </p>
+            </div>
+            ): "Login"}
         </button>
 
         {error && <p className="text-red-500 mt-2">{error}</p>}
