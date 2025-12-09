@@ -58,23 +58,9 @@ export default function RegisterPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4 flex justify-center">
             Creating your account
-            <span className="ellipsis ml-1"></span>
+            <span className="animate-ellipsis ml-1"></span>
           </h1>
           <p className="text-gray-500">Please wait</p>
-
-          {/* Inline CSS animation */}
-          <style jsx>{`
-            @keyframes dots {
-              0% { content: "."; }
-              33% { content: ".."; }
-              66% { content: "..."; }
-            }
-
-            .ellipsis::after {
-              content: ".";
-              animation: dots 1s infinite steps(1);
-            }
-          `}</style>
         </div>
       ) : (
         // Normal form
@@ -119,7 +105,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="bg-[#4267B2] text-white px-4 py-2 m-2 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+            className="bg-[#4267B2] text-white px-4 py-2 m-2 rounded-lg hover:bg-gray-800 hover:cursor-pointer disabled:opacity-50"
           >
             Register
           </button>
